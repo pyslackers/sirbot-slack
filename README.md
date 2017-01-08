@@ -1,1 +1,1 @@
-Write my code!
+# Slack plugin for Sir bot a lot
