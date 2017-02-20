@@ -57,12 +57,13 @@ class SlackMessageDispatcher:
 
         if 'message' in msg:
             text = msg['message']['text']
-            user_id = msg['message'].get('bot_id', msg.get('user'))
+            user_id = msg['message'].get('bot_id') or msg.get('user')
             timestamp = msg['message']['ts']
         else:
             text = msg['text']
-            user_id = msg.get('bot_id', msg.get('user'))
+            user_id = msg.get('bot_id') or msg.get('user')
             timestamp = msg['ts']
+
         if user_id.startswith('B'):
             # Bot message
             return
