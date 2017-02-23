@@ -37,6 +37,15 @@ class SlackMessage(Message):
                            timestamp=self.timestamp)
         return rep
 
+    def clone(self):
+        """
+        Clone the message except the content
+        :return: Message
+        """
+        return SlackMessage(to=self.to, incoming=self.incoming, frm=self.frm,
+                            timestamp=self.timestamp, mention=self.mention,
+                            as_user=self.as_user)
+
     @property
     def attachments(self):
         """
@@ -105,7 +114,6 @@ class SlackMessage(Message):
 
 
 class SlackContent(Content):
-
     def __init__(self):
         super().__init__()
         self.attachments = list()
