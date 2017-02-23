@@ -133,16 +133,19 @@ def register_slack_messages():
             'func': react,
         },
         {
-            'match': '{bot_name}',
+            'match': '',
             'func': react,
+            'on_mention': True
         },
         {
             'match': '(([Cc]an|[Mm]ay) I have the )?quote of the day\?$',
             'func': quote_of_the_day,
+            'on_mention': True
         },
         {
             'match': 'test message',
-            'func': test_message
+            'func': test_message,
+            'on_mention': True
         },
         # {
         #     'match': '{bot_name} ping me',

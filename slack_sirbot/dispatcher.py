@@ -25,6 +25,7 @@ class SlackMessageDispatcher:
     def __init__(self, users, channels, bot_id, pm):
         super().__init__()
         self.commands = defaultdict(list)
+        self.mention_commands = defaultdict(list)
         self._users = users
         self._channels = channels
         self.bot_name = '<@{}>'.format(bot_id)
@@ -64,11 +65,19 @@ class SlackMessageDispatcher:
             user_id = msg.get('bot_id') or msg.get('user')
             timestamp = msg['ts']
 
+        if channel[0] == 'D':
+            mention = True
+        elif channel[0] in 'CG' and text.startswith(self.bot_name):
+            text = text[len(self.bot_name):].strip()
+            mention = True
+        else:
+            mention = False
+
         if user_id.startswith('B'):
             # Bot message
             return
 
-        message = SlackMessage(text=text, timestamp=timestamp)
+        message = SlackMessage(text=text, timestamp=timestamp, mention=mention)
         if channel.startswith('D'):
             # If the channel starts with D it is a direct message to the bot
             user = await self._users.get(user_id)
@@ -92,17 +101,36 @@ class SlackMessageDispatcher:
                     logger.debug('Function is not a coroutine, converting.')
                     msg['func'] = asyncio.coroutine(msg['func'])
                 msg['match'] = msg['match'].format(bot_name=self.bot_name)
-                logger.debug('Registering new message: %s, %s in %s',
-                             msg['match'],
-                             msg['func'].__name__,
-                             inspect.getabsfile(msg['func']))
-                self.commands[re.compile(msg['match'], msg.get('flags', 0)
-                                         )].append(msg['func'])
+                if msg.get('on_mention'):
+                    logger.debug('Registering new on mention message: '
+                                 '%s, %s in %s',
+                                 msg['match'],
+                                 msg['func'].__name__,
+                                 inspect.getabsfile(msg['func']))
+                    self.mention_commands[re.compile(msg['match'],
+                                                     msg.get('flags', 0)
+                                                     )].append(msg['func'])
+                else:
+                    logger.debug('Registering new message: %s, %s in %s',
+                                 msg['match'],
+                                 msg['func'].__name__,
+                                 inspect.getabsfile(msg['func']))
+                    self.commands[re.compile(msg['match'], msg.get('flags', 0)
+                                             )].append(msg['func'])
 
     async def _dispatch(self, msg, chat, facades):
         """
         Dispatch an incoming slack message to the correct functions
         """
+        if msg.mention:
+            for match, funcs in self.mention_commands.items():
+                n = match.search(msg.text)
+                if n:
+                    logger.debug('Located handler for "{}", invoking'.format(
+                        msg.text))
+                    for func in funcs:
+                        await func(msg.response(), chat, n.groups(), facades)
+
         for match, funcs in self.commands.items():
             n = match.search(msg.text)
             if n:
@@ -133,11 +161,6 @@ class SlackMainDispatcher:
 
         self._pm = self._initialize_plugins()
         self._register(self._pm)
-
-        # self._import_plugins(plugins)
-        # self._initialize_plugins(token, scheduler)
-        # self._users = SlackUserManager(self._http_client, users)
-        # self._loop.create_task(self._start(scheduler))
 
     def _load_config(self, config):
         """
@@ -206,11 +229,8 @@ class SlackMainDispatcher:
         self._pm.add_hookspecs(hookspecs)
 
         for plugin in self.config['plugins']:
-            try:
-                p = importlib.import_module(plugin)
-                self._pm.register(p)
-            except ImportError:
-                logger.error('Can not import: %s', plugin)
+            p = importlib.import_module(plugin)
+            self._pm.register(p)
 
         return self._pm
 
@@ -269,4 +289,5 @@ class SlackMainDispatcher:
 
 @hookimpl
 def dispatchers(loop, config):
-    return METADATA['name'], SlackMainDispatcher(loop=loop, config=config.get(METADATA['name']))
+    return METADATA['name'], SlackMainDispatcher(loop=loop, config=config.get(
+        METADATA['name']))

@@ -1,10 +1,8 @@
-import pluggy
-
-from .api import RTMClient
 from .__meta__ import DATA as METADATA
+from .api import RTMClient
 from .dispatcher import SlackMainDispatcher
 
-hookimpl = pluggy.HookimplMarker('sirbot')
+from sirbot.hookimpl import hookimpl
 
 
 @hookimpl
