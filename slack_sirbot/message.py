@@ -12,11 +12,13 @@ logger = logging.getLogger('sirbot.slack')
 
 
 class SlackMessage(Message):
-    def __init__(self, *args, timestamp=0, as_user=True, **kwargs):
+    def __init__(self, *args, timestamp=0, as_user=True, mention=False,
+                 **kwargs):
         super().__init__(*args, content=SlackContent, **kwargs)
         self.timestamp = timestamp
         self.as_user = as_user
         self.type = METADATA['name']
+        self.mention = mention
 
     def serialize(self):
         data = self.content.serialize()
