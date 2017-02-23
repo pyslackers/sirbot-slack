@@ -65,13 +65,12 @@ class SlackMessageDispatcher:
             user_id = msg.get('bot_id') or msg.get('user')
             timestamp = msg['ts']
 
-        if channel[0] == 'D':
-            mention = True
-        elif channel[0] in 'CG' and text.startswith(self.bot_name):
+        mention = False
+        if text.startswith(self.bot_name):
             text = text[len(self.bot_name):].strip()
             mention = True
-        else:
-            mention = False
+        if channel[0] == 'D':
+            mention = True
 
         if user_id.startswith('B'):
             # Bot message
