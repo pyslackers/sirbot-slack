@@ -207,6 +207,7 @@ class SlackMainDispatcher:
         Parse data from the login message to the slack API
         """
         await self._parse_channels(login_data['channels'])
+        await self._parse_channels(login_data['groups'], groups=True)
         await self._parse_users(login_data['users'])
         self._id = login_data['self']['id']
 
@@ -259,13 +260,13 @@ class SlackMainDispatcher:
             for func in funcs:
                 await func(msg, chat, facades)
 
-    async def _parse_channels(self, channels):
+    async def _parse_channels(self, channels, groups=False):
         """
         Parse the channels at login and add them to the channel manager if
         the bot is in them
         """
         for channel in channels:
-            if channel['is_member'] is True:
+            if channel.get('is_member') is True or groups:
                 c = Channel(channel_id=channel['id'],
                             type_=METADATA['name'],
                             **channel)
