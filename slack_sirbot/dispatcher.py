@@ -140,11 +140,10 @@ class SlackMessageDispatcher:
 
 
 class SlackMainDispatcher:
-    def __init__(self, loop, config):
+    def __init__(self, loop):
 
         self._loop = loop or asyncio.get_event_loop()
-        self.config = config
-        self._load_config(config)
+        self._config = None
 
         logger.debug('Starting SlackMainDispatcher')
 
@@ -155,18 +154,18 @@ class SlackMainDispatcher:
         self._http_client = HTTPClient(loop=loop)
         self._users = SlackUserManager(self._http_client)
         self._channels = SlackChannelManager(self._http_client)
-
         self._message_dispatcher = None
 
-        self._pm = self._initialize_plugins()
-        self._register(self._pm)
-
-    def _load_config(self, config):
+    def configure(self, config):
         """
         Set the config
         """
+        self._config = config
         if 'loglevel' in config:
             logger.setLevel(config['loglevel'])
+
+        self._pm = self._initialize_plugins()
+        self._register(self._pm)
 
     async def incoming(self, msg, chat, facades):
         """
@@ -228,7 +227,7 @@ class SlackMainDispatcher:
         self._pm = pluggy.PluginManager('sirbot.slack')
         self._pm.add_hookspecs(hookspecs)
 
-        for plugin in self.config['plugins']:
+        for plugin in self._config['plugins']:
             p = importlib.import_module(plugin)
             self._pm.register(p)
 
@@ -288,6 +287,5 @@ class SlackMainDispatcher:
 
 
 @hookimpl
-def dispatchers(loop, config):
-    return METADATA['name'], SlackMainDispatcher(loop=loop, config=config.get(
-        METADATA['name']))
+def dispatchers(loop):
+    return METADATA['name'], SlackMainDispatcher(loop=loop)

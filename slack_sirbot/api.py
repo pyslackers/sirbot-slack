@@ -293,6 +293,7 @@ class RTMClient(APICaller):
                  loop: Optional[asyncio.BaseEventLoop]=None):
 
         super().__init__(token, loop=loop)
+        self._config = None
         self._queue = queue
         self._ws = None
         self._login_data = None
@@ -322,12 +323,13 @@ class RTMClient(APICaller):
         #       functionality if there is an error.
         return self._login_data
 
-    async def connect(self):
+    async def connect(self, config):
         """
         Connect to the websocket stream and iterate over the messages
         dumping them in the Queue.
         """
         logger.debug('Connecting...')
+        self._config = config
         try:
             # TODO: We will need to put in some logic for re-connection
             #       on error.
