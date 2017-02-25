@@ -98,26 +98,27 @@ async def test_message(message, slack, _, facade):
     await slack.send(message)
 
 
-async def ping(message, slack, _, facade):
-    """
-    Schedule a dm pinging the user every 10 seconds
-
-    """
-    if not slack.is_scheduled('ping-{}'.format(message.frm.id)):
-        message.text = 'ping'
-        message.to = message.frm
-        slack.schedule(slack.send, 'ping-{}'.format(message.frm.id), 'interval',
-                      func_args=[message], seconds=10)
-        await slack.send(message)
-
-
-async def stop_ping(message, slack, _, facade):
-    """
-    Unschedule the ping
-
-    """
-    if slack.is_scheduled('ping-{}'.format(message.frm.id)):
-        slack.unschedule('ping-{}'.format(message.frm.id))
+# async def ping(message, slack, _, facade):
+#     """
+#     Schedule a dm pinging the user every 10 seconds
+#
+#     """
+#     if not slack.is_scheduled('ping-{}'.format(message.frm.id)):
+#         message.text = 'ping'
+#         message.to = message.frm
+#         slack.schedule(slack.send, 'ping-{}'.format(message.frm.id),
+#                        'interval',
+#                       func_args=[message], seconds=10)
+#         await slack.send(message)
+#
+#
+# async def stop_ping(message, slack, _, facade):
+#     """
+#     Unschedule the ping
+#
+#     """
+#     if slack.is_scheduled('ping-{}'.format(message.frm.id)):
+#         slack.unschedule('ping-{}'.format(message.frm.id))
 
 
 async def hello_world(msg, *_):
@@ -162,14 +163,12 @@ def register_slack_messages():
 
 @hookimpl
 def register_slack_events():
-    
+
     events = [
         {
             'func': hello_world,
             'name': 'user_typing'
         }
     ]
-    
+
     return events
-
-

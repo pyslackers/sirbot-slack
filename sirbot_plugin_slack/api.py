@@ -199,7 +199,6 @@ class HTTPClient(APICaller):
             msg['ts'] = timestamp
         return msg
 
-
     def _prepare_reaction(self, message, reaction: str=''):
         """
         Format the message and reaction for the Slack API
