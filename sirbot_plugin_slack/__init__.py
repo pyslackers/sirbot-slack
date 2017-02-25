@@ -12,5 +12,4 @@ def clients(loop, queue):
 
 @hookimpl
 def dispatchers(loop):
-    return METADATA['name'], \
-           SlackMainDispatcher(loop=loop)
+    return METADATA['name'], SlackMainDispatcher(loop=loop)

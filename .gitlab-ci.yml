@@ -1,0 +1,16 @@
+image: python:3.5
+
+stages:
+  - lint
+  - test
+
+lint:
+  stage: lint
+  script:
+    - python setup.py flake8
+
+test:
+  stage: test
+  script:
+    - pip install git+https://gitlab.com/PythonDevCommunity/sir-bot-a-lot#egg=sirbot
+    - python setup.py test

@@ -12,7 +12,7 @@ if sys.version_info < (3, 5):
 
 
 def load_package_meta():
-    meta_path = convert_path('./slack_sirbot/__meta__.py')
+    meta_path = convert_path('./sirbot_plugin_slack/__meta__.py')
     meta_ns = {}
     with open(meta_path) as f:
         exec(f.read(), meta_ns)
@@ -23,6 +23,7 @@ PKG_META = load_package_meta()
 
 
 requirements = [
+    'PyYAML==3.12'
     # TODO: put package requirements here
 ]
 
@@ -67,10 +68,10 @@ setup(
         'slack',
     ],
     packages=[
-        'slack_sirbot'
+        'sirbot_plugin_slack'
     ],
     package_dir={
-        'slack_sirbot': 'slack_sirbot',
+        'sirbot_plugin_slack': 'sirbot_plugin_slack',
     },
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and
@@ -87,8 +88,10 @@ setup(
     install_requires=parse_reqs(),
     zip_safe=False,
     tests_require=[
-        'pytest',
+        'pytest-runner',
+        'pytest-cov',
         'pytest-aiohttp',
+        'pytest',
     ],
     setup_requires=[
         'pytest-runner',
