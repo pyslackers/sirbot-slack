@@ -22,4 +22,4 @@ class SlackAPIError(SlackClientError):
 
 
 class SlackMessageError(MessageError):
-    """Generic message error"""
+    """Generic slack message error"""
