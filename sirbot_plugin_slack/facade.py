@@ -1,6 +1,9 @@
 class SlackFacade:
     """
     A class to compose all available functionality of the slack plugin.
+
+    An instance is offered to all incoming message of all the plugins to
+    allow cross service messages
     """
 
     def __init__(self, http_client, users, channels, bot_id):

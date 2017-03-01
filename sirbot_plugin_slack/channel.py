@@ -9,7 +9,7 @@ logger = logging.getLogger('sirbot.slack')
 
 class Channel(Receiver):
     """
-    Class representing a channel.
+    Class representing a slack channel.
     """
     def __init__(self, channel_id, name, **kwargs):
         """
@@ -22,26 +22,63 @@ class Channel(Receiver):
 
     @property
     def name(self):
+        """
+        name of the channel
+        """
         return self._data['name']
 
     @name.setter
     def name(self, name):
-        self._data['name'] = name
+        raise ValueError('Readonly property')
 
-    def get(self, *information):
+    @property
+    def members(self):
+        """
+        Id of the users in the channels
+        :return: list of users id
+        :rtype: list
+        """
+        return self._data['members']
+
+    @members.setter
+    def members(self, members):
+        raise ValueError('Readonly property')
+
+    @property
+    def is_member(self):
+        """
+        Boolean if the bot is member of the channel
+        """
+        return self._data['is_members']
+
+    @is_member.setter
+    def is_member(self, is_member):
+        raise ValueError('Readonly property')
+
+    @property
+    def is_archive(self):
+        return self._data['is_archive']
+
+    @is_archive.setter
+    def is_archive(self, is_archive):
+        raise ValueError('Readonly property')
+
+    def get(self, information):
         """
         Query information on the channel
 
         :param information: information needed
         :return: information
-        :rtype: list
         """
-        output_information = list()
-        for info in information:
-            output_information.append(self._data.get(info))
-        return output_information
+        return self._data.get(information)
 
     def add(self, **kwargs):
+        """
+        Add information to the channel
+
+        :param kwargs:
+        :return:
+        """
         for item, value in kwargs.items():
             if item != 'id':
                 self._data[item] = value
@@ -51,7 +88,6 @@ class SlackChannelManager:
     """
     Manager for the slack channels
     """
-
     def __init__(self, client):
         logger.debug('Starting %s', self.__class__.__name__)
         self._client = client
@@ -59,23 +95,45 @@ class SlackChannelManager:
         self._names = dict()
 
     async def add(self, channel):
-
+        """
+        Add a channel to the channel manager
+        """
         self._channels[channel.id] = channel
         self._names[channel.name] = channel.id
 
-    async def get(self, id_=None, name=None):
+    async def get(self, id_=None, name=None, update=True):
+        """
+        Return a Channel from the Channel Manager
+
+        :param id_: id of the channel
+        :param name: name of the channel
+        :param update: query the slack api for updated channel info
+        :return: Channel
+        """
         if not id_ and not name:
-            raise ValueError
+            raise SyntaxError
         elif name:
             id_ = self._names.get(name)
-        return self._channels.get(id_)
+
+        channel = self._channels.get(id_)
+
+        if update:
+            channel.add(**(await self._client.get_channel_info(id_)))
+
+        return channel
 
     async def delete(self, id_=None, name=None):
+        """
+        Delete a channel from the channel manager
+
+        :param id_: id of the channel
+        :param name: name of the channel
+        :return: None
+        """
         if not id_ and not name:
-            raise ValueError
+            raise SyntaxError
         elif name:
             id_ = self._names.get(name)
-
         channel = self._channels.pop(id_)
         del self._names[channel.name]
 
@@ -88,57 +146,108 @@ def retrieve_channel_id(msg):
     return channel_id
 
 
-async def channel_deleted(msg, chat, facades):
-    channel_id = retrieve_channel_id(msg)
-    await chat.channels.delete(channel_id)
+async def channel_archive(event, slack, facades):
+    """
+    Use the channel archive event to delete the channel
+    from the ChannelManager
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = await slack.channels.get(channel_id, update=False)
+    channel._data['is_archive'] = True
 
 
-async def channel_joined(msg, chat, facades):
-    channel_id = retrieve_channel_id(msg)
-    channel = Channel(channel_id=channel_id, **msg['channel'])
-    await chat.channels.add(channel)
+async def channel_created(event, slack, facades):
+    """
+    Use the channel created event to add the channel
+    to the ChannelManager
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = Channel(channel_id=channel_id, **event['channel'])
+    await slack.channels.add(channel)
 
 
-async def channel_left(msg, chat, facades):
-    channel_id = retrieve_channel_id(msg)
-    await chat.channels.delete(channel_id)
+async def channel_deleted(event, slack, facades):
+    """
+    Use the channel delete event to delete the channel
+    from the ChannelManager
+    """
+    channel_id = retrieve_channel_id(event)
+    await slack.channels.delete(channel_id)
 
 
-async def channel_archive(msg, chat, facades):
-    channel_id = retrieve_channel_id(msg)
-    await chat.channels.delete(channel_id)
+async def channel_joined(event, slack, facades):
+    """
+    Use the channel joined event to update the channel status
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = await slack.channels.get(channel_id, update=False)
+    channel._data['is_member'] = True
 
 
-async def channel_rename(msg, chat, facades):
-    channel_id = retrieve_channel_id(msg)
-    channel = await chat.channels.get(channel_id)
-    channel.name = msg['channel']['name']
+async def channel_left(event, slack, facades):
+    """
+    Use the channel left event to update the channel status
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = await slack.channels.get(channel_id, update=False)
+    channel._data['is_member'] = False
+
+
+async def channel_rename(event, slack, facades):
+    """
+    User the channel rename event to update the name
+    of the channel
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = await slack.channels.get(channel_id, update=False)
+    old_name = channel.name
+    channel._data['name'] = event['channel']['name']
+    slack.channels._names[channel.name] = channel.id
+    del slack.channels._names[old_name]
+
+
+async def channel_unarchive(event, slack, facades):
+    """
+    Use the channel unarchive event to delete the channel
+    from the ChannelManager
+    """
+    channel_id = retrieve_channel_id(event)
+    channel = await slack.channels.get(channel_id, update=False)
+    channel._data['is_archive'] = False
 
 
 @hookimpl
 def register_slack_events():
     events = [
         {
-            'name': 'channel_rename',
-            'func': channel_rename,
-        },
-        {
             'name': 'channel_archive',
             'func': channel_archive
         },
         {
-            'name': 'channel_left',
-            'func': channel_left,
+            'name': 'channel_created',
+            'func': channel_created
+        },
+        {
+            'name': 'channel_deleted',
+            'func': channel_deleted
         },
         {
             'name': 'channel_joined',
             'func': channel_joined
         },
         {
-            'name': 'channel_deleted',
-            'func': channel_deleted
+            'name': 'channel_left',
+            'func': channel_left,
         },
+        {
+            'name': 'channel_rename',
+            'func': channel_rename,
+        },
+        {
+            'name': 'channel_unarchive',
+            'func': channel_unarchive,
 
+        }
     ]
 
     return events

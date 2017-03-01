@@ -22,16 +22,21 @@ class APIPath:
     """Path definitions for slack"""
     SLACK_API_ROOT = 'https://slack.com/api/{0}'
 
-    ADD_REACT = SLACK_API_ROOT.format('reactions.add')
-    DELETE_MSG = SLACK_API_ROOT.format('chat.delete')
-    DELETE_REACT = SLACK_API_ROOT.format('reactions.remove')
-    GET_CHANNEL = SLACK_API_ROOT.format('channels.list')
-    GET_CHANNEL_INFO = SLACK_API_ROOT.format('channels.info')
-    GET_REACT = SLACK_API_ROOT.format('reactions.get')
-    POST_MSG = SLACK_API_ROOT.format('chat.postMessage')
+    REACT_ADD = SLACK_API_ROOT.format('reactions.add')
+    REACT_DELETE = SLACK_API_ROOT.format('reactions.remove')
+    REACT_GET = SLACK_API_ROOT.format('reactions.get')
+
+    MSG_DELETE = SLACK_API_ROOT.format('chat.delete')
+    MSG_POST = SLACK_API_ROOT.format('chat.postMessage')
+    MSG_UPDATE = SLACK_API_ROOT.format('chat.update')
+
+    CHANNEL_GET = SLACK_API_ROOT.format('channels.list')
+    CHANNEL_INFO = SLACK_API_ROOT.format('channels.info')
+
     RTM_START = SLACK_API_ROOT.format('rtm.start')
-    UPDATE_MSG = SLACK_API_ROOT.format('chat.update')
-    GET_USER_INFO = SLACK_API_ROOT.format('users.info')
+
+    USER_INFO = SLACK_API_ROOT.format('users.info')
+
     IM_OPEN = SLACK_API_ROOT.format('im.open')
 
 
@@ -114,7 +119,7 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Delete: %s', message)
         message = message.serialize()
-        rep = await self._do_post(APIPath.DELETE_MSG, msg=message)
+        rep = await self._do_post(APIPath.MSG_DELETE, msg=message)
         return rep.get('ts')
 
     async def send(self, message):
@@ -127,7 +132,7 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Sent: %s', message)
         message = message.serialize()
-        rep = await self._do_post(APIPath.POST_MSG, msg=message)
+        rep = await self._do_post(APIPath.MSG_POST, msg=message)
         return rep.get('ts')
 
     async def update(self, message):
@@ -144,7 +149,7 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Update: %s', message)
         message = message.serialize()
-        rep = await self._do_post(APIPath.UPDATE_MSG, msg=message)
+        rep = await self._do_post(APIPath.MSG_UPDATE, msg=message)
         return rep.get('ts')
 
     async def add_reaction(self, message, reaction: str='thumbsup'):
@@ -158,7 +163,7 @@ class HTTPClient(APICaller):
         """
         msg = self._prepare_reaction(message, reaction)
         logger.debug('Reaction Add: %s', msg)
-        await self._do_post(APIPath.ADD_REACT, msg=msg)
+        await self._do_post(APIPath.REACT_ADD, msg=msg)
 
     async def delete_reaction(self, message, reaction: str):
         """
@@ -169,7 +174,7 @@ class HTTPClient(APICaller):
         """
         msg = self._prepare_reaction(message, reaction)
         logger.debug('Reaction Delete: %s', msg)
-        await self._do_post(APIPath.DELETE_REACT, msg=msg)
+        await self._do_post(APIPath.REACT_DELETE, msg=msg)
 
     async def get_reaction(self, message):
         """
@@ -183,7 +188,7 @@ class HTTPClient(APICaller):
         msg = self._prepare_reaction(message)
         msg['full'] = True  # Get all the message information
         logger.debug('Reaction Get: {}'.format(msg))
-        rep = await self._do_post(APIPath.GET_REACT, msg=msg)
+        rep = await self._do_post(APIPath.REACT_GET, msg=msg)
         return rep.get('message').get('reactions')
 
     def _prepare_message(self, message, timestamp: str=None):
@@ -225,7 +230,7 @@ class HTTPClient(APICaller):
         all_channels = []
         bot_channels = []
 
-        rep = await self._do_post(APIPath.GET_CHANNEL, msg={})
+        rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
         for chan in rep.get('channels'):
             channel = Channel(channel_id=chan['id'], **chan)
             all_channels.append(channel)
@@ -234,7 +239,7 @@ class HTTPClient(APICaller):
 
         return bot_channels, all_channels
 
-    async def get_channels_info(self, channel_id: str):
+    async def get_channel_info(self, channel_id: str):
         """
         Query the information about a channel
 
@@ -246,7 +251,7 @@ class HTTPClient(APICaller):
             'channel': channel_id
         }
 
-        rep = await self._do_post(APIPath.GET_CHANNEL_INFO, msg=msg)
+        rep = await self._do_post(APIPath.CHANNEL_INFO, msg=msg)
         return rep['channel']
 
     async def get_user_info(self, user_id: str):
@@ -261,7 +266,7 @@ class HTTPClient(APICaller):
             'user': user_id
         }
 
-        rep = await self._do_post(APIPath.GET_USER_INFO, msg=msg)
+        rep = await self._do_post(APIPath.USER_INFO, msg=msg)
         return rep['user']
 
     async def get_user_dm_channel(self, user_id: str):
