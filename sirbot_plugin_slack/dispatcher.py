@@ -212,6 +212,8 @@ class SlackMessageDispatcher:
             return
 
         if self.bot_name in text or channel.startswith('D'):
+            if text.startswith(self.bot_name):
+                text = text[len(self.bot_name):].strip()
             mention = True
         else:
             mention = False
