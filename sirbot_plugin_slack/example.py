@@ -126,9 +126,17 @@ async def hello_world(msg, *_):
     pass
 
 
+async def test(msg, slack, *_):
+    pass
+
+
 @hookimpl
 def register_slack_messages():
     commands = [
+        {
+            'match': 'test',
+            'func': test
+        },
         {
             'match': 'sirbot',
             'func': react,
