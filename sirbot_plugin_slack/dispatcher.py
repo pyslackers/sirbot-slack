@@ -116,7 +116,7 @@ class SlackMainDispatcher:
         self._pm = pluggy.PluginManager('sirbot.slack')
         self._pm.add_hookspecs(hookspecs)
 
-        for plugin in self._config['plugins']:
+        for plugin in self._config.get('plugins'):
             p = importlib.import_module(plugin)
             self._pm.register(p)
 
