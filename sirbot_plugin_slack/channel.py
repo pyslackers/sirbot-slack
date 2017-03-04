@@ -116,8 +116,21 @@ class SlackChannelManager:
             id_ = self._names.get(name)
 
         channel = self._channels.get(id_)
+        if not channel:
+            logger.debug('Channel not found in the channel manager'
+                         'Querying the Slack API')
+            if id_:
+                channel = Channel(channel_id=id_,
+                                  **(await self._client.get_channel_info(
+                                      id_)))
+            else:
+                _, channels = self._client.get_channels()
+                for channel in channels:
+                    if channel.name == name:
+                        return channel
+                return
 
-        if update:
+        elif update and channel:
             channel.add(**(await self._client.get_channel_info(id_)))
 
         return channel
