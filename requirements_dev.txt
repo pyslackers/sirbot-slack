@@ -16,3 +16,5 @@ pytest-cov==2.4.0
 pytest-runner==2.11.1
 flake8
 -e git+https://gitlab.com/PythonDevCommunity/sir-bot-a-lot#egg=sirbot
+recommonmark==0.4.0
+Sphinx==1.5.2

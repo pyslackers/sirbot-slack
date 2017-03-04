@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+import re
 
 from .hookimpl import hookimpl
 from .message import Attachment, Field, Button
@@ -98,36 +99,12 @@ async def test_message(message, slack, _, facade):
     await slack.send(message)
 
 
-# async def ping(message, slack, _, facade):
-#     """
-#     Schedule a dm pinging the user every 10 seconds
-#
-#     """
-#     if not slack.is_scheduled('ping-{}'.format(message.frm.id)):
-#         message.text = 'ping'
-#         message.to = message.frm
-#         slack.schedule(slack.send, 'ping-{}'.format(message.frm.id),
-#                        'interval',
-#                       func_args=[message], seconds=10)
-#         await slack.send(message)
-#
-#
-# async def stop_ping(message, slack, _, facade):
-#     """
-#     Unschedule the ping
-#
-#     """
-#     if slack.is_scheduled('ping-{}'.format(message.frm.id)):
-#         slack.unschedule('ping-{}'.format(message.frm.id))
-
-
 async def hello_world(msg, *_):
-    # print('user typing')
-    pass
+    print('user typing')
 
 
 async def test(msg, slack, *_):
-    pass
+    print('test')
 
 
 @hookimpl
@@ -154,16 +131,9 @@ def register_slack_messages():
         {
             'match': 'test message',
             'func': test_message,
-            'on_mention': True
+            'on_mention': True,
+            'flags': re.IGNORECASE
         },
-        # {
-        #     'match': '{bot_name} ping me',
-        #     'func': ping
-        # },
-        # {
-        #     'match': '{bot_name} stop ping',
-        #     'func': stop_ping
-        # }
     ]
 
     return commands

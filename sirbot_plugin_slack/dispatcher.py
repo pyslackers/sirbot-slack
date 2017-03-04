@@ -21,6 +21,8 @@ from .api import HTTPClient
 
 logger = logging.getLogger('sirbot.slack')
 
+MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
+
 
 class SlackMainDispatcher(Dispatcher):
     """
@@ -118,7 +120,7 @@ class SlackMainDispatcher(Dispatcher):
         self._pm = pluggy.PluginManager('sirbot.slack')
         self._pm.add_hookspecs(hookspecs)
 
-        for plugin in self._config.get('plugins'):
+        for plugin in MANDATORY_PLUGIN + self._config.get('plugins'):
             p = importlib.import_module(plugin)
             self._pm.register(p)
 
