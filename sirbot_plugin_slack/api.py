@@ -5,6 +5,7 @@ import os
 import json
 
 from typing import Any, AnyStr, Dict, Optional
+from sirbot.plugins.client import Client
 
 from .errors import (
     SlackConnectionError,
@@ -286,7 +287,7 @@ class HTTPClient(APICaller):
         return rep['channel']['id']
 
 
-class RTMClient(APICaller):
+class RTMClient(APICaller, Client):
     """
     Client for the slack RTM API (websocket based API).
 

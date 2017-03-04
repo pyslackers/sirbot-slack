@@ -11,6 +11,7 @@ from . import hookspecs
 from .__meta__ import DATA as METADATA
 
 from sirbot.hookimpl import hookimpl
+from sirbot.plugins.dispatcher import Dispatcher
 
 from .message import SlackMessage
 from .facade import SlackFacade
@@ -21,7 +22,7 @@ from .api import HTTPClient
 logger = logging.getLogger('sirbot.slack')
 
 
-class SlackMainDispatcher:
+class SlackMainDispatcher(Dispatcher):
     """
     Main dispatcher for the slack plugin.
 
@@ -30,6 +31,7 @@ class SlackMainDispatcher:
 
     def __init__(self, loop):
         logger.debug('Starting SlackMainDispatcher')
+        super().__init__(loop=loop)
 
         self._loop = loop or asyncio.get_event_loop()
         self._config = None
@@ -51,7 +53,7 @@ class SlackMainDispatcher:
         Configure the slack plugin
 
         This method is called by the core after initialization
-        :param config: configuration relevent to the slack plugin
+        :param config: configuration relevant to the slack plugin
         """
         self._config = config
         if 'loglevel' in config:
