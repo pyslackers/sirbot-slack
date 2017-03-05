@@ -5,7 +5,6 @@ import os
 import json
 
 from typing import Any, AnyStr, Dict, Optional
-from sirbot.plugins.client import Client
 
 from .errors import (
     SlackConnectionError,
@@ -13,7 +12,6 @@ from .errors import (
     SlackRedirectionError,
     SlackAPIError
 )
-from .__meta__ import DATA as METADATA
 from .channel import Channel
 
 logger = logging.getLogger('sirbot.slack')
@@ -52,7 +50,6 @@ class APICaller:
 
     def __init__(self, token: str=None, *,
                  loop: Optional[asyncio.BaseEventLoop]=None):
-        logger.debug('Starting %s', self.__class__.__name__)
         self._token = token or os.environ['SIRBOT_SLACK_TOKEN']
         self._loop = loop or asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
@@ -287,26 +284,21 @@ class HTTPClient(APICaller):
         return rep['channel']['id']
 
 
-class RTMClient(APICaller, Client):
+class RTMClient(APICaller):
     """
     Client for the slack RTM API (websocket based API).
 
     :param token: Slack API Token
     :param loop: Event loop to work in, optional.
     """
-    def __init__(self, queue, token: str=None, *,
-                 loop: Optional[asyncio.BaseEventLoop]=None):
+    def __init__(self, token, callback,
+                 *, loop: Optional[asyncio.BaseEventLoop]=None):
 
         super().__init__(token, loop=loop)
-        self._config = None
-        self._queue = queue
-        self._config = None
         self._ws = None
         self._login_data = None
         self._closed = asyncio.Event(loop=self._loop)
-
-    def configure(self, config, *_):
-        self._config = config
+        self._callback = callback
 
     @property
     def slack_id(self):
@@ -343,7 +335,7 @@ class RTMClient(APICaller, Client):
             #       on error.
             login_data = await self._negotiate_rtm_url()
             login_data['type'] = 'connected'
-            await self._queue.put((METADATA['name'], login_data))
+            await self._callback(login_data)
 
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(login_data['url']) as ws:
@@ -354,7 +346,7 @@ class RTMClient(APICaller, Client):
                                 break
                             else:
                                 msg = json.loads(data.data)
-                                await self._queue.put((METADATA['name'], msg))
+                                await self._callback(msg)
                         elif data.type == aiohttp.WSMsgType.CLOSED:
                             break
                         elif data.type == aiohttp.WSMsgType.ERROR:

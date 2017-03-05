@@ -1,8 +1,6 @@
 import logging
 import json
 
-from sirbot.message import Message, Content
-
 from .__meta__ import DATA as METADATA
 from .user import User
 from .channel import Channel
@@ -11,14 +9,18 @@ from .errors import SlackMessageError
 logger = logging.getLogger('sirbot.slack')
 
 
-class SlackMessage(Message):
-    def __init__(self, *args, timestamp=0, as_user=True, mention=False,
-                 **kwargs):
-        super().__init__(*args, content=SlackContent, **kwargs)
+class SlackMessage:
+    def __init__(self, timestamp=0, as_user=True, mention=False, text='',
+                 to=None, frm=None, incoming=None):
         self.timestamp = timestamp
         self.as_user = as_user
         self.type = METADATA['name']
         self.mention = mention
+        self.content = SlackContent()
+        self.text = text
+        self.to = to
+        self.frm = frm
+        self.incoming = incoming
 
     def serialize(self):
         data = self.content.serialize()
@@ -45,6 +47,14 @@ class SlackMessage(Message):
         return SlackMessage(to=self.to, incoming=self.incoming, frm=self.frm,
                             timestamp=self.timestamp, mention=self.mention,
                             as_user=self.as_user)
+
+    @property
+    def text(self):
+        return self.content.data['text']
+
+    @text.setter
+    def text(self, text):
+        self.content.data['text'] = text
 
     @property
     def attachments(self):
@@ -113,10 +123,10 @@ class SlackMessage(Message):
         return isinstance(self.to, Channel)
 
 
-class SlackContent(Content):
+class SlackContent:
     def __init__(self):
-        super().__init__()
         self.attachments = list()
+        self.data = dict()
 
     def serialize(self):
         self.data['attachments'] = list()

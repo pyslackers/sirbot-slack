@@ -2,74 +2,52 @@ import logging
 import asyncio
 import re
 import inspect
-import pluggy
-import importlib
 
 from collections import defaultdict
 
-from . import hookspecs
 from .__meta__ import DATA as METADATA
 
-from sirbot.hookimpl import hookimpl
-from sirbot.plugins.dispatcher import Dispatcher
 
 from .message import SlackMessage
-from .facade import SlackFacade
-from .user import SlackUserManager, User
-from .channel import SlackChannelManager, Channel
-from .api import HTTPClient
+from .user import User
+from .channel import Channel
 
 logger = logging.getLogger('sirbot.slack')
 
-MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
 
-
-class SlackMainDispatcher(Dispatcher):
+class SlackMainDispatcher:
     """
     Main dispatcher for the slack plugin.
 
     Sir-bot-a-lot core dispatch message to the incoming  method.
     """
 
-    def __init__(self, loop):
-        logger.debug('Starting SlackMainDispatcher')
-        super().__init__(loop=loop)
-
+    def __init__(self, http_client, users, channels, pm, facades, *, loop):
         self._loop = loop or asyncio.get_event_loop()
-        self._config = None
-        self._started = False
-        self._pm = None
-        self._id = None
 
-        self._http_client = HTTPClient(loop=loop)
-        self._users = SlackUserManager(self._http_client)
-        self._channels = SlackChannelManager(self._http_client)
+        self._config = None
+        self.bot_id = None
+        self._facades = None
+
+        self._started = False
+
+        self._pm = pm
+        self._http_client = http_client
+        self._users = users
+        self._channels = channels
+        self._facades = facades
 
         self._message_dispatcher = None
         self._event_dispatcher = None
 
-        self.events = defaultdict(list)
-
-    def configure(self, config):
-        """
-        Configure the slack plugin
-
-        This method is called by the core after initialization
-        :param config: configuration relevant to the slack plugin
-        """
-        self._config = config
-        if 'loglevel' in config:
-            logger.setLevel(config['loglevel'])
-
-        # Import the subplugins and register them
-        self._pm = self._initialize_plugins()
-
-    async def incoming(self, msg, slack_facade, facades):
+    async def incoming(self, msg):
         """
         Handle the incoming message
 
         This method is called for every incoming messages
         """
+        facades = self._facades.new()
+        slack_facade = facades.get(METADATA['name'])
         msg_type = msg.get('type', None)
         logger.debug('Incoming event: %s', msg_type)
 
@@ -84,7 +62,8 @@ class SlackMainDispatcher(Dispatcher):
             elif msg_type in ('hello', 'reconnect_url', None):
                 logging.debug('Ignoring event %s', msg)
             else:
-                await self._event_dispatcher.incoming(msg_type, msg,
+                await self._event_dispatcher.incoming(msg_type,
+                                                      msg,
                                                       slack_facade,
                                                       facades)
         elif msg_type == 'connected':
@@ -98,33 +77,17 @@ class SlackMainDispatcher(Dispatcher):
         await self._parse_channels(login_data['channels'])
         await self._parse_channels(login_data['groups'])
         await self._parse_users(login_data['users'])
-        self._id = login_data['self']['id']
+        self.bot_id = login_data['self']['id']
 
         self._message_dispatcher = SlackMessageDispatcher(self._users,
                                                           self._channels,
-                                                          self._id,
+                                                          self.bot_id,
                                                           self._pm)
 
         self._event_dispatcher = SlackEventDispatcher(self._pm)
 
         self._started = True
         logger.info('SlackMainDispatcher started !')
-
-    def _initialize_plugins(self):
-        """
-        Import and register the plugins
-
-        Most likely composed of functions reacting to events and messages
-        """
-        logger.debug('Initializing slack plugins')
-        self._pm = pluggy.PluginManager('sirbot.slack')
-        self._pm.add_hookspecs(hookspecs)
-
-        for plugin in MANDATORY_PLUGIN + self._config.get('plugins'):
-            p = importlib.import_module(plugin)
-            self._pm.register(p)
-
-        return self._pm
 
     async def _parse_channels(self, channels):
         """
@@ -144,16 +107,6 @@ class SlackMainDispatcher(Dispatcher):
         for user in users:
             u = User(user['id'], **user)
             await self._users.add(u)
-
-    def facade(self):
-        """
-        Initialize and return a new facade
-
-        This is called by the core when a for each incoming message and when
-        another plugin request a slack facade
-        """
-        return SlackFacade(self._http_client, self._users,
-                           self._channels, self._id)
 
 
 class SlackMessageDispatcher:
@@ -259,9 +212,8 @@ class SlackMessageDispatcher:
                                  msg['match'],
                                  msg['func'].__name__,
                                  inspect.getabsfile(msg['func']))
-                    self.mention_commands[re.compile(msg['match'],
-                                                     msg.get('flags', 0)
-                                                     )].append(msg['func'])
+                    c = re.compile(msg['match'], msg.get('flags', 0))
+                    self.mention_commands[c].append(msg['func'])
                 else:
                     logger.debug('Registering message: %s, %s in %s',
                                  msg['match'],
@@ -344,8 +296,3 @@ class SlackEventDispatcher:
                              event['func'].__name__,
                              inspect.getabsfile(event['func']))
                 self.events[event['name']].append(event['func'])
-
-
-@hookimpl
-def dispatchers(loop):
-    return METADATA['name'], SlackMainDispatcher(loop=loop)

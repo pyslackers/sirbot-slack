@@ -1,13 +1,11 @@
 import logging
 
-from sirbot.receiver import Receiver
-
 from .hookimpl import hookimpl
 
 logger = logging.getLogger('sirbot.slack')
 
 
-class Channel(Receiver):
+class Channel:
     """
     Class representing a slack channel.
     """
@@ -16,7 +14,8 @@ class Channel(Receiver):
         :param channel_id: id of the channel
         :param name: name of the channel
         """
-        super().__init__(channel_id, channel_id)
+        self.id = channel_id
+        self.send_id = channel_id
         self._data = {'name': name}
         self.add(**kwargs)
 
@@ -89,7 +88,6 @@ class SlackChannelManager:
     Manager for the slack channels
     """
     def __init__(self, client):
-        logger.debug('Starting %s', self.__class__.__name__)
         self._client = client
         self._channels = dict()
         self._names = dict()

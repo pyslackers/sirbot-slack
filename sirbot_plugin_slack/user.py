@@ -1,14 +1,12 @@
 import logging
 import time
 
-from sirbot.receiver import Receiver
-
 from .hookimpl import hookimpl
 
 logger = logging.getLogger('sirbot.slack')
 
 
-class User(Receiver):
+class User:
     def __init__(self, id_=None, **kwargs):
         """
         Class representing an user.
@@ -16,10 +14,10 @@ class User(Receiver):
         :param id_: id of the user
         :param name: name of the user
         """
+        self.id = id_
         self._data = dict()
         self.add(**kwargs)
         self.last_seen = time.time()
-        super().__init__(id_, None)
 
     def add(self, **kwargs):
         """
@@ -34,7 +32,7 @@ class User(Receiver):
         """
         id where the message need to be sent to reach the user
         """
-        return self._data['dm_channel_id']
+        return self._data.get('dm_channel_id')
 
     @send_id.setter
     def send_id(self, send_id):
@@ -83,7 +81,6 @@ class SlackUserManager:
     """
 
     def __init__(self, client):
-        logger.debug('Starting %s', self.__class__.__name__)
         self._client = client
         self._users = dict()
 
