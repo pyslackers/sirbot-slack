@@ -130,7 +130,7 @@ class SlackMessageDispatcher:
         """
         logger.debug('Message handler received %s', msg)
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
-                    'channel_leave', 'bot_message']
+                    'channel_leave', 'bot_message', 'message_replied']
 
         channel = msg.get('channel', None)
 
