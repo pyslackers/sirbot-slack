@@ -1,6 +1,5 @@
 from .__meta__ import DATA as METADATA
-from .api import RTMClient
-from .dispatcher import SlackMainDispatcher
+from .core import SirBotSlack
 
 from sirbot.hookimpl import hookimpl
 
@@ -9,10 +8,5 @@ __version__ = METADATA['version']
 
 
 @hookimpl
-def clients(loop, queue):
-    return METADATA['name'], RTMClient(loop=loop, queue=queue)
-
-
-@hookimpl
-def dispatchers(loop):
-    return METADATA['name'], SlackMainDispatcher(loop=loop)
+def plugins(loop):
+    return METADATA['name'], SirBotSlack(loop=loop)
