@@ -346,7 +346,7 @@ class RTMClient(APICaller):
                                 break
                             else:
                                 msg = json.loads(data.data)
-                                await self._callback(msg)
+                                asyncio.ensure_future(self._callback(msg))
                         elif data.type == aiohttp.WSMsgType.CLOSED:
                             break
                         elif data.type == aiohttp.WSMsgType.ERROR:
