@@ -3,6 +3,8 @@ import os
 import pluggy
 import importlib
 
+from sirbot import Plugin
+
 from . import hookspecs
 from .api import RTMClient, HTTPClient
 from .dispatcher import SlackMainDispatcher
@@ -15,12 +17,18 @@ logger = logging.getLogger('sirbot.slack')
 MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
 
 
-class SirBotSlack:
+class SirBotSlack(Plugin):
     def __init__(self, loop):
+        super().__init__(loop)
+        logger.debug('Initializing slack plugin')
         self._loop = loop
         self._config = None
         self._facades = None
-        self._token = os.environ['SIRBOT_SLACK_TOKEN']
+
+        self._token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
+        if not self._token:
+            raise EnvironmentError(
+                'SIRBOT_SLACK_TOKEN environment variable is not set')
 
         self._dispatcher = None
         self._rtm_client = None
@@ -29,10 +37,14 @@ class SirBotSlack:
         self._users = SlackUserManager(self._http_client)
         self._channels = SlackChannelManager(self._http_client)
 
-    def configure(self, config, router, facades):
-        if 'loglevel' in config:
-            logger.setLevel(config['loglevel'])
+    @property
+    def started(self):
+        if self._dispatcher:
+            return self._dispatcher.started
+        return False
 
+    def configure(self, config, router, facades):
+        logger.debug('Configuring slack plugin')
         self._config = config
 
         pm = self._initialize_plugins()
@@ -56,6 +68,7 @@ class SirBotSlack:
                            self._channels, self._dispatcher.bot_id)
 
     async def start(self):
+        logger.debug('Starting slack plugin')
         await self._rtm_client.connect()
 
     def _initialize_plugins(self):
@@ -64,11 +77,11 @@ class SirBotSlack:
 
         Most likely composed of functions reacting to events and messages
         """
-        logger.debug('Initializing slack plugin')
+        logger.debug('Initializing plugins of slack plugin')
         pm = pluggy.PluginManager('sirbot.slack')
         pm.add_hookspecs(hookspecs)
 
-        for plugin in MANDATORY_PLUGIN + self._config.get('plugins'):
+        for plugin in MANDATORY_PLUGIN + self._config.get('plugins', []):
             p = importlib.import_module(plugin)
             pm.register(p)
 

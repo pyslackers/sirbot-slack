@@ -72,7 +72,7 @@ class User:
         self._data['profile'] = profile
 
     def __str__(self):
-        return self.id
+        return '<User: {}>'.format(self.id)
 
 
 class SlackUserManager:

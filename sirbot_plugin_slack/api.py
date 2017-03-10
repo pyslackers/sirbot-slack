@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import aiohttp
-import os
 import json
 
 from typing import Any, AnyStr, Dict, Optional
+
+from sirbot.utils import ensure_future
 
 from .errors import (
     SlackConnectionError,
@@ -48,9 +49,9 @@ class APICaller:
     """
     __slots__ = ('_token', '_loop', '_session')
 
-    def __init__(self, token: str=None, *,
+    def __init__(self, token: str, *,
                  loop: Optional[asyncio.BaseEventLoop]=None):
-        self._token = token or os.environ['SIRBOT_SLACK_TOKEN']
+        self._token = token
         self._loop = loop or asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
 
@@ -336,21 +337,21 @@ class RTMClient(APICaller):
             login_data = await self._negotiate_rtm_url()
             login_data['type'] = 'connected'
             await self._callback(login_data)
-
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(login_data['url']) as ws:
-                    async for data in ws:
-                        if data.type == aiohttp.WSMsgType.TEXT:
-                            if data.data == 'close cmd':
-                                await ws.close()
-                                break
-                            else:
-                                msg = json.loads(data.data)
-                                asyncio.ensure_future(self._callback(msg))
-                        elif data.type == aiohttp.WSMsgType.CLOSED:
+            async with self._session.ws_connect(login_data['url']) as ws:
+                async for data in ws:
+                    if data.type == aiohttp.WSMsgType.TEXT:
+                        if data.data == 'close cmd':
+                            await ws.close()
                             break
-                        elif data.type == aiohttp.WSMsgType.ERROR:
-                            break
+                        else:
+                            msg = json.loads(data.data)
+                            ensure_future(self._callback(msg),
+                                          loop=self._loop,
+                                          logger=logger)
+                    elif data.type == aiohttp.WSMsgType.CLOSED:
+                        break
+                    elif data.type == aiohttp.WSMsgType.ERROR:
+                        break
 
         except asyncio.CancelledError:
             pass

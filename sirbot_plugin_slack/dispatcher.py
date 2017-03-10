@@ -7,10 +7,11 @@ from collections import defaultdict
 
 from .__meta__ import DATA as METADATA
 
-
 from .message import SlackMessage
 from .user import User
 from .channel import Channel
+
+from sirbot.utils import ensure_future
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -29,7 +30,7 @@ class SlackMainDispatcher:
         self.bot_id = None
         self._facades = None
 
-        self._started = False
+        self.started = False
 
         self._pm = pm
         self._http_client = http_client
@@ -53,7 +54,7 @@ class SlackMainDispatcher:
 
         # Wait for the plugin to be fully started before dispatching incoming
         # messages
-        if self._started:
+        if self.started:
             if msg_type == 'message':
                 # Send message to the message dispatcher and exit
                 await self._message_dispatcher.incoming(msg,
@@ -82,12 +83,13 @@ class SlackMainDispatcher:
         self._message_dispatcher = SlackMessageDispatcher(self._users,
                                                           self._channels,
                                                           self.bot_id,
-                                                          self._pm)
+                                                          self._pm,
+                                                          loop=self._loop)
 
-        self._event_dispatcher = SlackEventDispatcher(self._pm)
+        self._event_dispatcher = SlackEventDispatcher(self._pm,
+                                                      loop=self._loop)
 
-        self._started = True
-        logger.info('SlackMainDispatcher started !')
+        self.started = True
 
     async def _parse_channels(self, channels):
         """
@@ -110,13 +112,14 @@ class SlackMainDispatcher:
 
 
 class SlackMessageDispatcher:
-    def __init__(self, users, channels, bot_id, pm):
+    def __init__(self, users, channels, bot_id, pm, *, loop):
         self.commands = defaultdict(list)
         self.mention_commands = defaultdict(list)
         self._users = users
         self._channels = channels
         self.bot_name = '<@{}>'.format(bot_id)
         self._register(pm)
+        self._loop = loop
 
     async def incoming(self, msg, slack_facade, facades):
         """
@@ -250,16 +253,15 @@ class SlackMessageDispatcher:
                     handlers.append((func, n))
 
         for func in handlers:
-            asyncio.ensure_future(func[0](msg.response(),
-                                          slack_facade,
-                                          facades,
-                                          func[1]))
+            f = func[0](msg.response(), slack_facade, facades, func[1])
+            ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
 
 class SlackEventDispatcher:
-    def __init__(self, pm):
+    def __init__(self, pm, *, loop):
         self.events = defaultdict(list)
         self._register(pm)
+        self._loop = loop
 
     async def incoming(self, event_type, event, slack_facade, facades):
         """
@@ -274,7 +276,8 @@ class SlackEventDispatcher:
         :return: None
         """
         for func in self.events.get(event_type, list()):
-            asyncio.ensure_future(func(event, slack_facade, facades))
+            f = func(event, slack_facade, facades)
+            ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
     def _register(self, pm):
         """

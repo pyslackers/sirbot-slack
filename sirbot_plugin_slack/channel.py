@@ -82,6 +82,9 @@ class Channel:
             if item != 'id':
                 self._data[item] = value
 
+    def __str__(self):
+        return '<Channel: {}>'.format(self.id)
+
 
 class SlackChannelManager:
     """

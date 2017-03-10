@@ -18,7 +18,6 @@ Want to join? `Get an invite`_ !
 
    quickstart
    installation
-   configuration
    usage
    plugins
    facade
