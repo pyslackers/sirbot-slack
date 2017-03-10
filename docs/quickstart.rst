@@ -1,6 +1,6 @@
-===================
+===========
 Quick Start
-===================
+===========
 
 |build| |coverage| |doc|
 
@@ -50,15 +50,10 @@ The base Sir-bot-a-lot configuration file for sirbot-slack-plugin look like this
 
 .. code-block:: yaml
 
-    loglevel: 10
-    port: 8080
-
     core:
-      loglevel: 10
       plugins:
       - sirbot-plugin-slack
 
     sirbot_plugin_slack:
-      loglevel: 10
       plugins:
       - sirbot_plugin_slack.example

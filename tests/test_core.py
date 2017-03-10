@@ -1,10 +1,15 @@
 import sirbot
 import pytest
+import asyncio
 
-async def test_bot_is_starting(loop, test_server):
-    bot = sirbot.SirBot(loop=loop)
-    await test_server(bot._app)
-    assert bot._app == bot.app
-    assert bot._incoming_queue
-    assert bot._dispatcher
-    assert 'incoming' in bot._tasks
+from sirbot_plugin_slack.errors import SlackAPIError
+
+CONFIG = {
+    'core': {
+        'plugins': ['sirbot_plugin_slack', ]
+    }
+}
+
+async def test_no_token(loop, test_server):
+    with pytest.raises(EnvironmentError):
+        bot = sirbot.SirBot(loop=loop, config=CONFIG)

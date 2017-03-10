@@ -1,9 +1,6 @@
-loglevel: 10
 core:
-  loglevel: 10
   plugins:
     - sirbot_plugin_slack
 sirbot_plugin_slack:
-  loglevel: 10
   plugins:
   - sirbot_plugin_slack.example

@@ -71,6 +71,7 @@ async def test_message(message, slack, _, facade):
     Confirmation for the 'danger' button
     Change the username/avatar of the bot
     """
+
     message.text = 'A beautiful message'
     message.username = 'BOT'
     message.icon = ':tada:'
