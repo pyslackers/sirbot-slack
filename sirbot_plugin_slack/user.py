@@ -150,7 +150,7 @@ async def user_change(event, slack, facades):
     Use the user change event to update the user information
     """
     user = await slack.users.get(event['user']['id'])
-    user.update(**event['user'])
+    user.add(**event['user'])
 
 
 async def team_join(event, slack, facades):

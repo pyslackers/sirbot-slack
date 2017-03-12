@@ -41,7 +41,7 @@ class SlackMainDispatcher:
         self._message_dispatcher = None
         self._event_dispatcher = None
 
-    async def incoming(self, msg):
+    async def incoming(self, msg, msg_type):
         """
         Handle the incoming message
 
@@ -49,7 +49,6 @@ class SlackMainDispatcher:
         """
         facades = self._facades.new()
         slack_facade = facades.get(METADATA['name'])
-        msg_type = msg.get('type', None)
         logger.debug('Incoming event: %s', msg_type)
 
         # Wait for the plugin to be fully started before dispatching incoming
@@ -117,6 +116,7 @@ class SlackMessageDispatcher:
         self.mention_commands = defaultdict(list)
         self._users = users
         self._channels = channels
+        self.bot_id = bot_id
         self.bot_name = '<@{}>'.format(bot_id)
         self._register(pm)
         self._loop = loop
@@ -167,7 +167,7 @@ class SlackMessageDispatcher:
             user_id = msg.get('bot_id') or msg.get('user')
             timestamp = msg['ts']
 
-        if user_id.startswith('B'):
+        if user_id.startswith('B') or user_id == self.bot_id:
             # Ignoring bot messages
             return
 

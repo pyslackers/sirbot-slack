@@ -2,6 +2,7 @@ import logging
 import os
 import pluggy
 import importlib
+import asyncio
 
 from sirbot import Plugin
 
@@ -11,6 +12,7 @@ from .dispatcher import SlackMainDispatcher
 from .user import SlackUserManager
 from .channel import SlackChannelManager
 from .facade import SlackFacade
+from .errors import SlackConnectionError
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -55,7 +57,7 @@ class SirBotSlack(Plugin):
                                                facades=facades,
                                                loop=self._loop)
         self._rtm_client = RTMClient(token=self._token, loop=self._loop,
-                                     callback=self._dispatcher.incoming)
+                                     callback=self.incoming)
 
     def facade(self):
         """
@@ -70,6 +72,23 @@ class SirBotSlack(Plugin):
     async def start(self):
         logger.debug('Starting slack plugin')
         await self._rtm_client.connect()
+
+    async def _reconnect(self):
+        logger.debug('Trying to reconnect to slack')
+        try:
+            await self._rtm_client.connect()
+        except SlackConnectionError:
+            await asyncio.sleep(1, loop=self._loop)
+            await self._reconnect()
+
+    async def incoming(self, msg):
+        msg_type = msg.get('type', None)
+
+        if msg_type in ('team_migration_started', 'goodbye'):
+            logger.debug('Bot needs to reconnect')
+            await self._reconnect()
+        else:
+            await self._dispatcher.incoming(msg, msg_type)
 
     def _initialize_plugins(self):
         """
