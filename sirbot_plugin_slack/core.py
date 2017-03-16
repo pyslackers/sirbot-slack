@@ -63,7 +63,8 @@ class SirBotSlack(Plugin):
                                                facades=facades,
                                                loop=self._loop)
         self._rtm_client = RTMClient(token=self._token, loop=self._loop,
-                                     callback=self.incoming)
+                                     callback=self.incoming,
+                                     session=self._session)
 
     def facade(self):
         """
