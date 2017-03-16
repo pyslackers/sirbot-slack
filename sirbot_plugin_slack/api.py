@@ -50,10 +50,11 @@ class APICaller:
     __slots__ = ('_token', '_loop', '_session')
 
     def __init__(self, token: str, *,
-                 loop: Optional[asyncio.BaseEventLoop]=None):
+                 loop: Optional[asyncio.BaseEventLoop]=None,
+                 session: aiohttp.ClientSession=None):
         self._token = token
         self._loop = loop or asyncio.get_event_loop()
-        self._session = aiohttp.ClientSession(loop=self._loop)
+        self._session = session or aiohttp.ClientSession(loop=self._loop)
 
     def __del__(self):
         if not self._session.closed:
@@ -293,9 +294,10 @@ class RTMClient(APICaller):
     :param loop: Event loop to work in, optional.
     """
     def __init__(self, token, callback,
-                 *, loop: Optional[asyncio.BaseEventLoop]=None):
+                 *, loop: Optional[asyncio.BaseEventLoop]=None,
+                 session: aiohttp.ClientSession = None):
 
-        super().__init__(token, loop=loop)
+        super().__init__(token, loop=loop, session=session)
         self._ws = None
         self._login_data = None
         self._closed = asyncio.Event(loop=self._loop)
