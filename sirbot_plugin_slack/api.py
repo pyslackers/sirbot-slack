@@ -294,10 +294,9 @@ class RTMClient(APICaller):
     :param loop: Event loop to work in, optional.
     """
     def __init__(self, token, callback,
-                 *, loop: Optional[asyncio.BaseEventLoop]=None,
-                 session: aiohttp.ClientSession = None):
+                 *, loop: Optional[asyncio.BaseEventLoop]=None):
 
-        super().__init__(token, loop=loop, session=session)
+        super().__init__(token, loop=loop)
         self._ws = None
         self._login_data = None
         self._closed = asyncio.Event(loop=self._loop)
