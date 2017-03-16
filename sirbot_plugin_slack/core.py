@@ -26,6 +26,7 @@ class SirBotSlack(Plugin):
         self._loop = loop
         self._config = None
         self._facades = None
+        self._session = None
 
         self._token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
         if not self._token:
@@ -34,10 +35,9 @@ class SirBotSlack(Plugin):
 
         self._dispatcher = None
         self._rtm_client = None
-
-        self._http_client = HTTPClient(token=self._token, loop=loop)
-        self._users = SlackUserManager(self._http_client)
-        self._channels = SlackChannelManager(self._http_client)
+        self._http_client = None
+        self._users = None
+        self._channels = None
 
     @property
     def started(self):
@@ -45,9 +45,15 @@ class SirBotSlack(Plugin):
             return self._dispatcher.started
         return False
 
-    def configure(self, config, router, facades):
+    async def configure(self, config, router, session, facades):
         logger.debug('Configuring slack plugin')
         self._config = config
+        self._session = session
+
+        self._http_client = HTTPClient(token=self._token, loop=self._loop,
+                                       session=self._session)
+        self._users = SlackUserManager(self._http_client)
+        self._channels = SlackChannelManager(self._http_client)
 
         pm = self._initialize_plugins()
         self._dispatcher = SlackMainDispatcher(http_client=self._http_client,
@@ -57,7 +63,8 @@ class SirBotSlack(Plugin):
                                                facades=facades,
                                                loop=self._loop)
         self._rtm_client = RTMClient(token=self._token, loop=self._loop,
-                                     callback=self.incoming)
+                                     callback=self.incoming,
+                                     session=self._session)
 
     def facade(self):
         """
