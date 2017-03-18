@@ -231,10 +231,15 @@ class HTTPClient(APICaller):
         bot_channels = []
 
         rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
-        for chan in rep.get('channels'):
-            channel = Channel(channel_id=chan['id'], **chan)
+        for data in rep.get('channels'):
+            channel = Channel(
+                id_=data['id'],
+                name=data['name'],
+                is_member=data['is_member'],
+                is_archived=data['is_archived']
+            )
             all_channels.append(channel)
-            if chan.get('is_member'):
+            if channel.is_member:
                 bot_channels.append(channel)
 
         return bot_channels, all_channels
