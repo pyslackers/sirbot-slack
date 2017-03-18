@@ -12,7 +12,7 @@ from .dispatcher import SlackMainDispatcher
 from .user import SlackUserManager
 from .channel import SlackChannelManager
 from .facade import SlackFacade
-from .errors import SlackConnectionError
+from .errors import SlackClientError
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -84,10 +84,10 @@ class SirBotSlack(Plugin):
         await self._rtm_client.connect()
 
     async def _reconnect(self):
-        logger.debug('Trying to reconnect to slack')
+        logger.warning('Trying to reconnect to slack')
         try:
             await self._rtm_client.connect()
-        except SlackConnectionError:
+        except SlackClientError:
             await asyncio.sleep(1, loop=self._loop)
             await self._reconnect()
 

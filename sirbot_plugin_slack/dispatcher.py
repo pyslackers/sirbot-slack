@@ -81,7 +81,8 @@ class SlackMainDispatcher:
                           (ts, channel, user, text)
                           VALUES (?, ?, ?, ?)
                           ''',
-                         (msg['ts'], msg['channel'], msg['user'], msg['text'])
+                         (msg['ts'], msg['channel'], msg.get('user'),
+                          msg.get('text'))
                          )
         await db.commit()
 

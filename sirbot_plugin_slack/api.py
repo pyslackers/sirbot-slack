@@ -86,7 +86,7 @@ class APICaller:
                     # logger.debug('Web API response: %s', rep)
                     return rep
                 else:
-                    logger.warning('Slack HTTP API response: %s', rep)
+                    logger.warning('Slack HTTP API response: %s, %s', rep, msg)
                     raise SlackAPIError(rep)
             elif 300 <= response.status < 400:
                 e = 'Redirection, status code: {}'.format(response.status)
