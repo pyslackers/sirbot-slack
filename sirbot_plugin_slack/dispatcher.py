@@ -23,7 +23,8 @@ class SlackMainDispatcher:
     Sir-bot-a-lot core dispatch message to the incoming  method.
     """
 
-    def __init__(self, http_client, users, channels, pm, facades, *, loop):
+    def __init__(self, http_client, users, channels, pm, facades, store,
+                 *, loop):
         self._loop = loop or asyncio.get_event_loop()
 
         self._config = None
@@ -37,6 +38,7 @@ class SlackMainDispatcher:
         self._users = users
         self._channels = channels
         self._facades = facades
+        self._store = store
 
         self._message_dispatcher = None
         self._event_dispatcher = None
@@ -54,7 +56,12 @@ class SlackMainDispatcher:
         # Wait for the plugin to be fully started before dispatching incoming
         # messages
         if self.started:
+
             if msg_type == 'message':
+                if self._store is True:
+                    db = facades.get('database')
+                    await self._store_incoming(msg, db)
+
                 # Send message to the message dispatcher and exit
                 await self._message_dispatcher.incoming(msg,
                                                         slack_facade,
@@ -69,14 +76,25 @@ class SlackMainDispatcher:
         elif msg_type == 'connected':
             await self._login(msg)
 
+    async def _store_incoming(self, msg, db):
+        await db.execute('''INSERT INTO slack_messages
+                          (ts, channel, user, text)
+                          VALUES (?, ?, ?, ?)
+                          ''',
+                         (msg['ts'], msg['channel'], msg['user'], msg['text'])
+                         )
+        await db.commit()
+
     async def _login(self, login_data):
         """
         Parse data from the login event to slack
         and initialize the message and event dispatcher
         """
-        await self._parse_channels(login_data['channels'])
-        await self._parse_channels(login_data['groups'])
-        await self._parse_users(login_data['users'])
+        logger.debug('Loading teams info')
+        db = self._facades.get('database')
+        await self._parse_channels(login_data['channels'], db=db)
+        await self._parse_channels(login_data['groups'], db=db)
+        await self._parse_users(login_data['users'], db=db)
         self.bot_id = login_data['self']['id']
 
         self._message_dispatcher = SlackMessageDispatcher(self._users,
@@ -87,27 +105,29 @@ class SlackMainDispatcher:
 
         self._event_dispatcher = SlackEventDispatcher(self._pm,
                                                       loop=self._loop)
-
+        await db.commit()
         self.started = True
 
-    async def _parse_channels(self, channels):
+    async def _parse_channels(self, channels, db):
         """
         Parse the channels at login and add them to the channel manager if
         the bot is in them
         """
         for channel in channels:
-            c = Channel(channel_id=channel['id'],
-                        type_=METADATA['name'],
-                        **channel)
-            await self._channels.add(c)
+            c = Channel(id_=channel['id'],
+                        name=channel['name'],
+                        is_member=channel.get('is_member', False),
+                        is_archived=channel.get('is_archived', False))
+            await self._channels.add(c, db=db)
 
-    async def _parse_users(self, users):
+    async def _parse_users(self, users, db):
         """
         Parse the users at login and add them in the user manager
         """
         for user in users:
-            u = User(user['id'], **user)
-            await self._users.add(u)
+            u = User(id_=user['id'],
+                     admin=user.get('is_admin', False))
+            await self._users.add(u, db=db)
 
 
 class SlackMessageDispatcher:
@@ -135,22 +155,15 @@ class SlackMessageDispatcher:
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
                     'channel_leave', 'bot_message', 'message_replied']
 
-        channel = msg.get('channel', None)
-
         if msg.get('subtype') in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
-        if channel[0] not in 'CGD':
-            logger.debug('Unknown channel, Unable to handle this channel: %s',
-                         channel)
-            return
-
-        message = await self._parse_message(msg, channel)
+        message = await self._parse_message(msg, facades.get('database'))
         if message:
             await self._dispatch(message, slack_facade, facades)
 
-    async def _parse_message(self, msg, channel):
+    async def _parse_message(self, msg, db):
         """
         Parse incoming message into a SlackMessage
 
@@ -158,6 +171,13 @@ class SlackMessageDispatcher:
         :param channel: channel of the incoming message
         :return: SlackMessage or None
         """
+        channel = msg.get('channel', None)
+
+        if channel[0] not in 'CGD':
+            logger.debug('Unknown channel, Unable to handle this channel: %s',
+                         channel)
+            return
+
         if 'message' in msg:
             text = msg['message']['text']
             user_id = msg['message'].get('bot_id') or msg.get('user')
@@ -179,18 +199,14 @@ class SlackMessageDispatcher:
             mention = False
 
         message = SlackMessage(text=text, timestamp=timestamp, mention=mention)
+        message.frm = await self._users.get(user_id, dm=True, db=db,
+                                            update=False)
 
         if channel.startswith('D'):
-            # If the channel starts with D it is a direct message to the bot
-            user = await self._users.get(id_=user_id, update=False)
-            user.send_id = channel
-            message.frm = user
-            message.to = user
+            message.to = message.frm
         else:
-            message.frm = await self._users.get(user_id, dm=True,
-                                                update=False)
             message.to = await self._channels.get(id_=msg['channel'],
-                                                  update=False)
+                                                  update=False, db=db)
 
         return message
 

@@ -49,19 +49,21 @@ class SirBotSlack(Plugin):
         logger.debug('Configuring slack plugin')
         self._config = config
         self._session = session
+        self._facades = facades
 
         self._http_client = HTTPClient(token=self._token, loop=self._loop,
                                        session=self._session)
         self._users = SlackUserManager(self._http_client)
         self._channels = SlackChannelManager(self._http_client)
-
         pm = self._initialize_plugins()
+        store = config.get('store', False)
         self._dispatcher = SlackMainDispatcher(http_client=self._http_client,
                                                users=self._users,
                                                channels=self._channels,
                                                pm=pm,
                                                facades=facades,
-                                               loop=self._loop)
+                                               loop=self._loop,
+                                               store=store)
         self._rtm_client = RTMClient(token=self._token, loop=self._loop,
                                      callback=self.incoming,
                                      session=self._session)
@@ -78,6 +80,7 @@ class SirBotSlack(Plugin):
 
     async def start(self):
         logger.debug('Starting slack plugin')
+        await self._create_db_table()
         await self._rtm_client.connect()
 
     async def _reconnect(self):
@@ -112,3 +115,31 @@ class SirBotSlack(Plugin):
             pm.register(p)
 
         return pm
+
+    async def _create_db_table(self):
+        db = self._facades.get('database')
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_users (
+        id TEXT PRIMARY KEY NOT NULL,
+        dm_id TEXT,
+        admin BOOLEAN DEFAULT False
+        )
+        ''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_channels (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT UNIQUE,
+        is_member BOOLEAN,
+        is_archived BOOLEAN
+        )
+        ''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
+        ts TEXT,
+        channel TEXT,
+        user TEXT,
+        text TEXT,
+        PRIMARY KEY (ts, channel)
+        )
+        ''')
+
+        await db.commit()

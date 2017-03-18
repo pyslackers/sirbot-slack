@@ -125,3 +125,4 @@ venv/
 debian/
 .pyvenv/
 __pycache__/*
+*.db
