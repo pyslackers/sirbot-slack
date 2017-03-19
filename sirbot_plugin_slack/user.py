@@ -110,16 +110,6 @@ async def user_typing(event, slack, facades):
     await db.commit()
 
 
-async def user_change(event, slack, facades):
-    """
-    Use the user change event to update the user information
-    """
-    db = facades.get('database')
-    user = await slack.users.get(event['user']['id'])
-    user.add(**event['user'])
-    await db.commit()
-
-
 async def team_join(event, slack, facades):
     """
     Use the team join event to add an user to the user manager
@@ -137,10 +127,6 @@ def register_slack_events():
         {
             'name': 'user_typing',
             'func': user_typing
-        },
-        {
-            'name': 'user_change',
-            'func': user_change
         },
         {
             'name': 'team_join',
