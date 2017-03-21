@@ -20,6 +20,9 @@ MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
 
 
 class SirBotSlack(Plugin):
+    __name__ = 'slack'
+    __version__ = '0.0.1'
+
     def __init__(self, loop):
         super().__init__(loop)
         logger.debug('Initializing slack plugin')
@@ -142,4 +145,5 @@ class SirBotSlack(Plugin):
         )
         ''')
 
+        await db.set_plugin_metadata(self)
         await db.commit()
