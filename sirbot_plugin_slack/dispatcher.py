@@ -225,22 +225,13 @@ class SlackMessageDispatcher:
                 if not asyncio.iscoroutinefunction(msg['func']):
                     logger.debug('Function is not a coroutine, converting.')
                     msg['func'] = asyncio.coroutine(msg['func'])
+                logger.debug('Registering message: %s, %s in %s',
+                             msg['match'],
+                             msg['func'].__name__,
+                             inspect.getabsfile(msg['func']))
                 msg['match'] = msg['match'].format(bot_name=self.bot_name)
-                if msg.get('on_mention'):
-                    logger.debug('Registering on mention message: '
-                                 '%s, %s in %s',
-                                 msg['match'],
-                                 msg['func'].__name__,
-                                 inspect.getabsfile(msg['func']))
-                    c = re.compile(msg['match'], msg.get('flags', 0))
-                    self.mention_commands[c].append(msg['func'])
-                else:
-                    logger.debug('Registering message: %s, %s in %s',
-                                 msg['match'],
-                                 msg['func'].__name__,
-                                 inspect.getabsfile(msg['func']))
-                    self.commands[re.compile(msg['match'], msg.get('flags', 0)
-                                             )].append(msg['func'])
+                self.commands[re.compile(msg['match'],
+                                         msg.get('flags', 0))].append(msg)
 
     async def _dispatch(self, msg, slack_facade, facades):
         """
@@ -252,22 +243,18 @@ class SlackMessageDispatcher:
         :return: None
         """
         handlers = list()
-        if msg.mention:
-            for match, funcs in self.mention_commands.items():
-                n = match.search(msg.text)
-                if n:
-                    logger.debug('Located handler for "{}", invoking'.format(
-                        msg.text))
-                    for func in funcs:
-                        handlers.append((func, n))
-
-        for match, funcs in self.commands.items():
+        for match, commands in self.commands.items():
             n = match.search(msg.text)
             if n:
-                logger.debug('Located handler for "{}", invoking'.format(
-                    msg.text))
-                for func in funcs:
-                    handlers.append((func, n))
+                for command in commands:
+                    if command.get('mention') and not msg.mention:
+                        continue
+                    elif command.get('admin') and not msg.frm.admin:
+                        continue
+
+                    logger.debug('Located handler for "{}", invoking'.format(
+                        msg.text))
+                    handlers.append((command['func'], n))
 
         for func in handlers:
             f = func[0](msg.response(), slack_facade, facades, func[1])
