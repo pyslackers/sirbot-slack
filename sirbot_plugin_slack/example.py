@@ -122,17 +122,17 @@ def register_slack_messages():
         {
             'match': '',
             'func': react,
-            'on_mention': True
+            'mention': True
         },
         {
             'match': '(([Cc]an|[Mm]ay) I have the )?quote of the day\?$',
             'func': quote_of_the_day,
-            'on_mention': True
+            'mention': True
         },
         {
             'match': 'test message',
             'func': test_message,
-            'on_mention': True,
+            'mention': True,
             'flags': re.IGNORECASE
         },
     ]
