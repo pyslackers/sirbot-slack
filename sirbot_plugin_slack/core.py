@@ -60,14 +60,15 @@ class SirBotSlack(Plugin):
         self._users = SlackUserManager(self._http_client)
         self._channels = SlackChannelManager(self._http_client)
         pm = self._initialize_plugins()
-        store = config.get('store', False)
-        self._dispatcher = SlackMainDispatcher(http_client=self._http_client,
-                                               users=self._users,
-                                               channels=self._channels,
-                                               pm=pm,
-                                               facades=facades,
-                                               loop=self._loop,
-                                               store=store)
+        self._dispatcher = SlackMainDispatcher(
+            http_client=self._http_client,
+            users=self._users,
+            channels=self._channels,
+            pm=pm,
+            facades=facades,
+            loop=self._loop,
+            config=self._config
+        )
         self._rtm_client = RTMClient(token=self._token, loop=self._loop,
                                      callback=self.incoming,
                                      session=self._session)
@@ -104,6 +105,15 @@ class SirBotSlack(Plugin):
         else:
             await self._dispatcher.incoming(msg, msg_type)
 
+    async def database_update(self, metadata, db):
+
+        if metadata['version'] == '0.0.1':
+            await db.execute(
+                '''ALTER TABLE slack_messages ADD COLUMN type TEXT''')
+            metadata['version'] = '0.0.2'
+
+        return self.__version__
+
     def _initialize_plugins(self):
         """
         Import and register the plugins
@@ -125,7 +135,7 @@ class SirBotSlack(Plugin):
         await db.execute('''CREATE TABLE IF NOT EXISTS slack_users (
         id TEXT PRIMARY KEY NOT NULL,
         dm_id TEXT,
-        admin BOOLEAN DEFAULT False
+        admin BOOLEAN DEFAULT FALSE
         )
         ''')
 
@@ -142,6 +152,7 @@ class SirBotSlack(Plugin):
         channel TEXT,
         user TEXT,
         text TEXT,
+        type TEXT,
         PRIMARY KEY (ts, channel)
         )
         ''')

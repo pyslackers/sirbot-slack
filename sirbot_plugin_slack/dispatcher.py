@@ -23,11 +23,11 @@ class SlackMainDispatcher:
     Sir-bot-a-lot core dispatch message to the incoming  method.
     """
 
-    def __init__(self, http_client, users, channels, pm, facades, store,
+    def __init__(self, http_client, users, channels, pm, facades, config,
                  *, loop):
         self._loop = loop or asyncio.get_event_loop()
 
-        self._config = None
+        self._config = config
         self.bot_id = None
         self._facades = None
 
@@ -38,7 +38,6 @@ class SlackMainDispatcher:
         self._users = users
         self._channels = channels
         self._facades = facades
-        self._store = store
 
         self._message_dispatcher = None
         self._event_dispatcher = None
@@ -58,10 +57,6 @@ class SlackMainDispatcher:
         if self.started:
 
             if msg_type == 'message':
-                if self._store is True:
-                    db = facades.get('database')
-                    await self._store_incoming(msg, db)
-
                 # Send message to the message dispatcher and exit
                 await self._message_dispatcher.incoming(msg,
                                                         slack_facade,
@@ -76,16 +71,6 @@ class SlackMainDispatcher:
         elif msg_type == 'connected':
             await self._login(msg)
 
-    async def _store_incoming(self, msg, db):
-        await db.execute('''INSERT INTO slack_messages
-                          (ts, channel, user, text)
-                          VALUES (?, ?, ?, ?)
-                          ''',
-                         (msg['ts'], msg['channel'], msg.get('user'),
-                          msg.get('text'))
-                         )
-        await db.commit()
-
     async def _login(self, login_data):
         """
         Parse data from the login event to slack
@@ -98,14 +83,20 @@ class SlackMainDispatcher:
         await self._parse_users(login_data['users'], db=db)
         self.bot_id = login_data['self']['id']
 
-        self._message_dispatcher = SlackMessageDispatcher(self._users,
-                                                          self._channels,
-                                                          self.bot_id,
-                                                          self._pm,
-                                                          loop=self._loop)
+        self._message_dispatcher = SlackMessageDispatcher(
+            self._users,
+            self._channels,
+            self.bot_id,
+            self._pm,
+            self._config.get('save', {}).get('message', False),
+            loop=self._loop
+        )
 
-        self._event_dispatcher = SlackEventDispatcher(self._pm,
-                                                      loop=self._loop)
+        self._event_dispatcher = SlackEventDispatcher(
+            self._pm,
+            loop=self._loop
+        )
+
         await db.commit()
         self.started = True
 
@@ -132,7 +123,7 @@ class SlackMainDispatcher:
 
 
 class SlackMessageDispatcher:
-    def __init__(self, users, channels, bot_id, pm, *, loop):
+    def __init__(self, users, channels, bot_id, pm, save, *, loop):
         self.commands = defaultdict(list)
         self.mention_commands = defaultdict(list)
         self._users = users
@@ -141,6 +132,7 @@ class SlackMessageDispatcher:
         self.bot_name = '<@{}>'.format(bot_id)
         self._register(pm)
         self._loop = loop
+        self._save = save
 
     async def incoming(self, msg, slack_facade, facades):
         """
@@ -156,6 +148,10 @@ class SlackMessageDispatcher:
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
                     'channel_leave', 'bot_message', 'message_replied']
 
+        if self._save is True:
+            db = facades.get('database')
+            await self._store_incoming(msg, db)
+
         if msg.get('subtype') in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
@@ -163,6 +159,22 @@ class SlackMessageDispatcher:
         message = await self._parse_message(msg, facades.get('database'))
         if message:
             await self._dispatch(message, slack_facade, facades)
+
+    async def _store_incoming(self, msg, db):
+        logger.debug('Saving incoming msg in %s at %s', msg['channel'],
+                     msg['ts'])
+        await db.execute('''INSERT INTO slack_messages
+                          (ts, channel, user, text, type)
+                          VALUES (?, ?, ?, ?, ?)
+                          ''',
+                         (msg['ts'], msg['channel'], msg.get('user'),
+                          msg.get('text'), msg.get('subtype'))
+                         )
+
+        if 'text' not in msg and 'subtype' not in msg:
+            logger.warning('Message without subtype and text: %s', msg)
+
+        await db.commit()
 
     async def _parse_message(self, msg, db):
         """
