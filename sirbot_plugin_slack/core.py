@@ -32,11 +32,7 @@ class SirBotSlack(Plugin):
         self._facades = None
         self._session = None
 
-        self._token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
-        if not self._token:
-            raise EnvironmentError(
-                'SIRBOT_SLACK_TOKEN environment variable is not set')
-
+        self._token = None
         self._dispatcher = None
         self._rtm_client = None
         self._http_client = None
@@ -54,6 +50,11 @@ class SirBotSlack(Plugin):
         self._config = config
         self._session = session
         self._facades = facades
+
+        self._token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
+        if not self._token:
+            raise EnvironmentError(
+                'SIRBOT_SLACK_TOKEN environment variable is not set')
 
         self._http_client = HTTPClient(token=self._token, loop=self._loop,
                                        session=self._session)
