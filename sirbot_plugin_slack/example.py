@@ -108,6 +108,22 @@ async def test(msg, slack, *_):
     print('test')
 
 
+async def parrot(message, slack, facades, *_):
+    message.text = 'Send stop to stop the parrot'
+    await slack.send(message)
+
+    return {'func': parrot_next}
+
+
+async def parrot_next(message, slack, facades, *_):
+    if message.incoming.text != 'stop':
+        message.text = 'Your previous message was: `{}`'.format(
+            message.incoming.previous[0]['text'])
+        await slack.send(message)
+
+        return {'func': parrot_next}
+
+
 @hookimpl
 def register_slack_messages():
     commands = [
@@ -135,6 +151,11 @@ def register_slack_messages():
             'mention': True,
             'flags': re.IGNORECASE
         },
+        {
+            'match': 'parrot',
+            'func': parrot,
+            'mention': True,
+        }
     ]
 
     return commands
@@ -142,7 +163,6 @@ def register_slack_messages():
 
 @hookimpl
 def register_slack_events():
-
     events = [
         {
             'func': hello_world,

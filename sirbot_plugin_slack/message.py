@@ -21,6 +21,8 @@ class SlackMessage:
         self.to = to
         self.frm = frm
         self.incoming = incoming
+        self.previous = []
+        self.conversation_id = None
 
     def serialize(self):
         data = self.content.serialize()

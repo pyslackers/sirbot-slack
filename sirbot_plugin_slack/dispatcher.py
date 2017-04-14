@@ -3,6 +3,8 @@ import asyncio
 import re
 import inspect
 import json
+import functools
+import time
 
 from collections import defaultdict
 
@@ -126,7 +128,7 @@ class SlackMainDispatcher:
 class SlackMessageDispatcher:
     def __init__(self, users, channels, bot_id, pm, save, *, loop):
         self.commands = defaultdict(list)
-        self.mention_commands = defaultdict(list)
+        self.callbacks = dict()
         self._users = users
         self._channels = channels
         self.bot_id = bot_id
@@ -146,12 +148,13 @@ class SlackMessageDispatcher:
         :return:
         """
         logger.debug('Message handler received %s', msg)
-        ignoring = ['message_changed', 'message_deleted', 'channel_join',
-                    'channel_leave', 'bot_message', 'message_replied']
 
         if self._save is True:
             db = facades.get('database')
             await self._store_incoming(msg, db)
+
+        ignoring = ['message_changed', 'message_deleted', 'channel_join',
+                    'channel_leave', 'bot_message', 'message_replied']
 
         if msg.get('subtype') in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
@@ -162,6 +165,13 @@ class SlackMessageDispatcher:
             await self._dispatch(message, slack_facade, facades)
 
     async def _store_incoming(self, msg, db):
+        """
+        Store incoming message in db
+
+        :param msg: message
+        :param db: db facade
+        :return: None
+        """
         logger.debug('Saving incoming msg in %s at %s', msg['channel'],
                      msg['ts'])
         if 'attachment' in msg:
@@ -170,12 +180,13 @@ class SlackMessageDispatcher:
             attachment = 0
 
         await db.execute('''INSERT INTO slack_messages
-                          (ts, channel, user, text, type, attachment, raw)
-                          VALUES (?, ?, ?, ?, ?, ?, ?)
+                          (ts, channel, user, text, type, attachment, raw,
+                           conversation_id)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                           ''',
                          (msg['ts'], msg['channel'], msg.get('user'),
                           msg.get('text'), msg.get('subtype'),
-                          attachment, json.dumps(msg))
+                          attachment, json.dumps(msg), msg['ts'])
                          )
 
         if 'text' not in msg and 'subtype' not in msg:
@@ -262,22 +273,95 @@ class SlackMessageDispatcher:
         :return: None
         """
         handlers = list()
-        for match, commands in self.commands.items():
-            n = match.search(msg.text)
-            if n:
-                for command in commands:
-                    if command.get('mention') and not msg.mention:
-                        continue
-                    elif command.get('admin') and not msg.frm.admin:
-                        continue
+        db = facades.get('database')
 
-                    logger.debug('Located handler for "{}", invoking'.format(
-                        msg.text))
-                    handlers.append((command['func'], n))
+        if msg.frm.id in self.callbacks \
+                and msg.to.id in self.callbacks[msg.frm.id] \
+                and time.time() < self.callbacks[msg.frm.id][msg.to.id][
+                    'time'] + self.callbacks[msg.frm.id][msg.to.id]['timeout']:
+            logger.debug('Located callback for "{}" in "{}", invoking'.format(
+                msg.frm.id, msg.to.id))
+
+            msg.previous = await self._find_conversation_messages(
+                self.callbacks[msg.frm.id][msg.to.id]['id'], db=db)
+            msg.conversation_id = self.callbacks[msg.frm.id][msg.to.id]['id']
+
+            await self._update_conversation_id(msg, db)
+
+            handlers.append((self.callbacks[msg.frm.id][msg.to.id]['func'],
+                             'callback'))
+            del self.callbacks[msg.frm.id][msg.to.id]
+        else:
+            for match, commands in self.commands.items():
+                n = match.search(msg.text)
+                if n:
+                    for command in commands:
+                        if command.get('mention') and not msg.mention:
+                            continue
+                        elif command.get('admin') and not msg.frm.admin:
+                            continue
+
+                        logger.debug(
+                            'Located handler for "{}", invoking'.format(
+                                msg.text))
+                        handlers.append((command['func'], n))
 
         for func in handlers:
             f = func[0](msg.response(), slack_facade, facades, func[1])
-            ensure_future(coroutine=f, loop=self._loop, logger=logger)
+            self.ensure_handler(coroutine=f, msg=msg, db=db)
+
+    def ensure_handler(self, coroutine, msg, db):
+        future_callback = functools.partial(self.handler_done_callback,
+                                            msg=msg,
+                                            db=db,
+                                            loop=self._loop)
+        future = asyncio.ensure_future(coroutine, loop=self._loop)
+        future.add_done_callback(future_callback)
+
+    def handler_done_callback(self, f, msg, db, loop):
+        try:
+            error = f.exception()
+            result = f.result()
+        except asyncio.CancelledError:
+            return
+
+        if error is not None:
+            logger.exception("Task exited with error",
+                             exc_info=error)
+
+        if result and 'func' in result:
+            to = result.get('to', msg.to)
+            frm = result.get('frm', msg.frm)
+            callback = result['func']
+            timeout = result.get('timeout', 300)
+            conversation_id = msg.conversation_id or msg.timestamp
+
+            if frm.id not in self.callbacks:
+                self.callbacks[frm.id] = dict()
+            self.callbacks[frm.id][to.id] = {
+                'func': callback,
+                'time': time.time(),
+                'timeout': timeout,
+                'id': conversation_id
+            }
+
+    async def _update_conversation_id(self, msg, db):
+        await db.execute('''UPDATE slack_messages SET conversation_id=?
+                             WHERE ts=?'''
+                         , (msg.conversation_id, msg.timestamp)
+                         )
+        await db.commit()
+
+    async def _find_conversation_messages(self, conversation_id, db):
+
+        await db.execute('''SELECT * FROM slack_messages
+                             WHERE conversation_id=? ORDER BY ts DESC''',
+                         (conversation_id,))
+
+        messages = await db.fetchall()
+        logger.debug('{} messages found in the'
+                     ' conversation'.format(len(messages)))
+        return messages
 
 
 class SlackEventDispatcher:
@@ -298,6 +382,7 @@ class SlackEventDispatcher:
         :param facades: main facade
         :return: None
         """
+
         for func in self.events.get(event_type, list()):
             f = func(event, slack_facade, facades)
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
