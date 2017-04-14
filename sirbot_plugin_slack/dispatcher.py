@@ -2,6 +2,7 @@ import logging
 import asyncio
 import re
 import inspect
+import json
 
 from collections import defaultdict
 
@@ -174,7 +175,7 @@ class SlackMessageDispatcher:
                           ''',
                          (msg['ts'], msg['channel'], msg.get('user'),
                           msg.get('text'), msg.get('subtype'),
-                          attachment, msg)
+                          attachment, json.dumps(msg))
                          )
 
         if 'text' not in msg and 'subtype' not in msg:
