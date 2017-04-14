@@ -106,15 +106,6 @@ class SirBotSlack(Plugin):
         else:
             await self._dispatcher.incoming(msg, msg_type)
 
-    async def database_update(self, metadata, db):
-
-        if metadata['version'] == '0.0.1':
-            await db.execute(
-                '''ALTER TABLE slack_messages ADD COLUMN type TEXT''')
-            metadata['version'] = '0.0.2'
-
-        return self.__version__
-
     def _initialize_plugins(self):
         """
         Import and register the plugins
@@ -130,6 +121,20 @@ class SirBotSlack(Plugin):
             pm.register(p)
 
         return pm
+
+    async def database_update(self, metadata, db):
+
+        if metadata['version'] == '0.0.1':
+            await db.execute(
+                '''ALTER TABLE slack_messages ADD COLUMN type TEXT''')
+            metadata['version'] = '0.0.2'
+
+        if metadata['version'] == '0.0.2':
+            await db.execute(
+                '''ALTER TABLE slack_messages ADD COLUMN attachment INT''')
+            metadata['version'] = '0.0.3'
+
+        return self.__version__
 
     async def _create_db_table(self):
         db = self._facades.get('database')
@@ -154,6 +159,7 @@ class SirBotSlack(Plugin):
         user TEXT,
         text TEXT,
         type TEXT,
+        attachment INT,
         PRIMARY KEY (ts, channel)
         )
         ''')

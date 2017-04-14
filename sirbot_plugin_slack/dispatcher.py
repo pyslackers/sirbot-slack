@@ -163,12 +163,18 @@ class SlackMessageDispatcher:
     async def _store_incoming(self, msg, db):
         logger.debug('Saving incoming msg in %s at %s', msg['channel'],
                      msg['ts'])
+        if 'attachment' in msg:
+            attachment = len(msg['attachment'])
+        else:
+            attachment = 0
+
         await db.execute('''INSERT INTO slack_messages
-                          (ts, channel, user, text, type)
-                          VALUES (?, ?, ?, ?, ?)
+                          (ts, channel, user, text, type, attachment)
+                          VALUES (?, ?, ?, ?, ?, ?)
                           ''',
                          (msg['ts'], msg['channel'], msg.get('user'),
-                          msg.get('text'), msg.get('subtype'))
+                          msg.get('text'), msg.get('subtype'),
+                          attachment)
                          )
 
         if 'text' not in msg and 'subtype' not in msg:
