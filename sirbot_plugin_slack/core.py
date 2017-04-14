@@ -134,6 +134,11 @@ class SirBotSlack(Plugin):
                 '''ALTER TABLE slack_messages ADD COLUMN attachment INT''')
             metadata['version'] = '0.0.3'
 
+        if metadata['version'] == '0.0.3':
+            await db.execute(
+                '''ALTER TABLE slack_messages ADD COLUMN raw TEXT''')
+            metadata['version'] = '0.0.4'
+
         return self.__version__
 
     async def _create_db_table(self):
@@ -160,6 +165,7 @@ class SirBotSlack(Plugin):
         text TEXT,
         type TEXT,
         attachment INT,
+        raw TEXT,
         PRIMARY KEY (ts, channel)
         )
         ''')

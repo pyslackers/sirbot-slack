@@ -169,12 +169,12 @@ class SlackMessageDispatcher:
             attachment = 0
 
         await db.execute('''INSERT INTO slack_messages
-                          (ts, channel, user, text, type, attachment)
-                          VALUES (?, ?, ?, ?, ?, ?)
+                          (ts, channel, user, text, type, attachment, raw)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)
                           ''',
                          (msg['ts'], msg['channel'], msg.get('user'),
                           msg.get('text'), msg.get('subtype'),
-                          attachment)
+                          attachment, msg)
                          )
 
         if 'text' not in msg and 'subtype' not in msg:
