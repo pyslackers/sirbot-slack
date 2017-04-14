@@ -6,6 +6,7 @@ import asyncio
 
 from sirbot import Plugin
 
+from .__meta__ import DATA as METADATA
 from . import hookspecs
 from .api import RTMClient, HTTPClient
 from .dispatcher import SlackMainDispatcher
@@ -20,8 +21,8 @@ MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
 
 
 class SirBotSlack(Plugin):
-    __name__ = 'slack'
-    __version__ = '0.0.1'
+    __name__ = METADATA['name']
+    __version__ = METADATA['version']
 
     def __init__(self, loop):
         super().__init__(loop)
