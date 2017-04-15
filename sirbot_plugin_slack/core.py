@@ -139,6 +139,31 @@ class SirBotSlack(Plugin):
                 '''ALTER TABLE slack_messages ADD COLUMN raw TEXT''')
             metadata['version'] = '0.0.4'
 
+        if metadata['version'] == '0.0.4':
+            await db.execute('''ALTER TABLE slack_messages
+                                 RENAME TO slack_messages_tmp''')
+
+            await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
+            ts REAL,
+            channel TEXT,
+            user TEXT,
+            text TEXT,
+            type TEXT,
+            attachment INT,
+            raw TEXT,
+            conversation_id REAL,
+            PRIMARY KEY (ts, channel)
+            )
+            ''')
+
+            await db.execute('''INSERT INTO slack_messages(ts, channel, user,
+                                 text, type, attachment, raw, conversation_id)
+                                 SELECT * FROM slack_messages_tmp''')
+
+            await db.execute('''DROP TABLE slack_messages_tmp''')
+
+            metadata['version'] = '0.0.5'
+
         return self.__version__
 
     async def _create_db_table(self):
@@ -159,13 +184,14 @@ class SirBotSlack(Plugin):
         ''')
 
         await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
-        ts TEXT,
+        ts REAL,
         channel TEXT,
         user TEXT,
         text TEXT,
         type TEXT,
         attachment INT,
         raw TEXT,
+        conversation_id REAL,
         PRIMARY KEY (ts, channel)
         )
         ''')
