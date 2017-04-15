@@ -157,7 +157,7 @@ class SirBotSlack(Plugin):
             ''')
 
             await db.execute('''INSERT INTO slack_messages(ts, channel, user,
-                                 text, type, attachment, raw, conversation_id)
+                                 text, type, attachment, raw)
                                  SELECT * FROM slack_messages_tmp''')
 
             await db.execute('''DROP TABLE slack_messages_tmp''')
