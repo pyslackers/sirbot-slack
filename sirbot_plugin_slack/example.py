@@ -1,6 +1,7 @@
-import aiohttp
 import logging
 import re
+
+import aiohttp
 
 from .hookimpl import hookimpl
 from .message import Attachment, Field, Button
@@ -117,8 +118,9 @@ async def parrot(message, slack, facades, *_):
 
 async def parrot_next(message, slack, facades, *_):
     if message.incoming.text != 'stop':
+        previous = await slack.conversation(message.incoming, limit=1)
         message.text = 'Your previous message was: `{}`'.format(
-            message.incoming.previous[0]['text'])
+            previous[0].text)
         await slack.send(message)
 
         return {'func': parrot_next}

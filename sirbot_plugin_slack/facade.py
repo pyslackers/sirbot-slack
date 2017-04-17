@@ -1,3 +1,11 @@
+import json
+import logging
+
+from .message import SlackMessage
+
+logger = logging.getLogger('sirbot.slack')
+
+
 class SlackFacade:
     """
     A class to compose all available functionality of the slack plugin.
@@ -6,11 +14,13 @@ class SlackFacade:
     allow cross service messages
     """
 
-    def __init__(self, http_client, users, channels, bot_id):
+    def __init__(self, http_client, users, channels, bot, facades):
+        self._facades = facades
         self._http_client = http_client
-        self.bot_id = bot_id
+
         self.users = users
         self.channels = channels
+        self.bot = bot
 
     async def send(self, *messages):
         """
@@ -19,8 +29,12 @@ class SlackFacade:
         :param messages: Messages to send
         """
         for message in messages:
-            message.timestamp = await self._http_client.send(
-                message=message)
+            message.frm = self.bot
+            message.raw = await self._http_client.send(message=message)
+            message.timestamp = message.raw.get('ts')
+            if not message.conversation_id:
+                message.conversation_id = message.timestamp
+            await self._save_outgoing_message(message)
 
     async def update(self, *messages):
         """
@@ -88,3 +102,45 @@ class SlackFacade:
             reactions[message] = msg_reactions
             message.reactions = msg_reactions
         return reactions
+
+    async def conversation(self, msg, limit=0):
+        query = '''SELECT raw FROM slack_messages
+                             WHERE conversation_id=? AND ts <= ?
+                             ORDER BY ts DESC'''
+
+        db = self._facades.get('database')
+
+        if limit:
+            query += ' LIMIT ?'
+            await db.execute(query,
+                             (msg.conversation_id, msg.timestamp, limit))
+        else:
+            await db.execute(query, (msg.conversation_id, msg.timestamp))
+
+        raw_msgs = await db.fetchall()
+        return [
+            await SlackMessage.from_raw(json.loads(raw_msg['raw']), slack=self)
+            for raw_msg in raw_msgs]
+
+    async def _save_outgoing_message(self, message):
+        """
+        Store outgoing message in db
+
+        :param msg: message
+        :param db: db facade
+        :return: None
+        """
+        logger.debug('Saving outgoing msg to %s at %s',
+                     message.to.id, message.timestamp)
+        db = self._facades.get('database')
+        await db.execute('''INSERT INTO slack_messages
+                          (ts, from_id, to_id, type, conversation_id, text,
+                           raw)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)
+                          ''',
+                         (message.timestamp, message.frm.id, message.to.id,
+                          message.subtype, message.conversation_id,
+                          message.text, json.dumps(message.raw))
+                         )
+
+        await db.commit()

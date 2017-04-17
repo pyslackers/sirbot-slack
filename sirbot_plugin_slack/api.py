@@ -133,7 +133,7 @@ class HTTPClient(APICaller):
         logger.debug('Message Sent: %s', message)
         message = message.serialize()
         rep = await self._do_post(APIPath.MSG_POST, msg=message)
-        return rep.get('ts')
+        return rep
 
     async def update(self, message):
         """
