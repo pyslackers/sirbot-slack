@@ -1,19 +1,19 @@
 import asyncio
-import logging
-import aiohttp
 import json
-
+import logging
+import time
 from typing import Any, AnyStr, Dict, Optional
 
+import aiohttp
 from sirbot.utils import ensure_future
 
+from .channel import Channel
 from .errors import (
     SlackConnectionError,
     SlackServerError,
     SlackRedirectionError,
     SlackAPIError
 )
-from .channel import Channel
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -50,8 +50,8 @@ class APICaller:
     __slots__ = ('_token', '_loop', '_session')
 
     def __init__(self, token: str, *,
-                 loop: Optional[asyncio.BaseEventLoop]=None,
-                 session: aiohttp.ClientSession=None):
+                 loop: Optional[asyncio.BaseEventLoop] = None,
+                 session: aiohttp.ClientSession = None):
         self._token = token
         self._loop = loop or asyncio.get_event_loop()
         self._session = session or aiohttp.ClientSession(loop=self._loop)
@@ -61,8 +61,8 @@ class APICaller:
             self._session.close()
 
     async def _do_post(self, url: str, *,
-                       msg: Optional[Dict[AnyStr, Any]]=None,
-                       token: Optional[AnyStr]=None):
+                       msg: Optional[Dict[AnyStr, Any]] = None,
+                       token: Optional[AnyStr] = None):
         """
         Perform a POST request, validating the response code.
         This will throw a SlackAPIError, or decendent, on non-200
@@ -150,9 +150,9 @@ class HTTPClient(APICaller):
         logger.debug('Message Update: %s', message)
         message = message.serialize()
         rep = await self._do_post(APIPath.MSG_UPDATE, msg=message)
-        return rep.get('ts')
+        return rep
 
-    async def add_reaction(self, message, reaction: str='thumbsup'):
+    async def add_reaction(self, message, reaction: str = 'thumbsup'):
         """
         Add a reaction to a message
 
@@ -191,7 +191,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.REACT_GET, msg=msg)
         return rep.get('message').get('reactions')
 
-    def _prepare_message(self, message, timestamp: str=None):
+    def _prepare_message(self, message, timestamp: str = None):
         """
         Format the message for the Slack API
         :param message: Message to send/update/delete
@@ -204,7 +204,7 @@ class HTTPClient(APICaller):
             msg['ts'] = timestamp
         return msg
 
-    def _prepare_reaction(self, message, reaction: str=''):
+    def _prepare_reaction(self, message, reaction: str = ''):
         """
         Format the message and reaction for the Slack API
         :param message: Message to add/delete/get reaction
@@ -227,22 +227,31 @@ class HTTPClient(APICaller):
         team.
         """
         logger.debug('Getting channels')
-        all_channels = []
-        bot_channels = []
 
         rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
-        for data in rep.get('channels'):
-            channel = Channel(
+        now = time.time()
+        channels = [
+            Channel(
                 id_=data['id'],
-                name=data['name'],
-                is_member=data['is_member'],
-                is_archived=data['is_archived']
+                raw=data,
+                last_update=now
             )
-            all_channels.append(channel)
-            if channel.is_member:
-                bot_channels.append(channel)
+            for data in rep.get('channels', [])
+        ]
 
-        return bot_channels, all_channels
+        return channels
+
+    async def find_channel(self, name):
+        logger.debug('Finding channel: %s', name)
+        rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
+
+        for data in rep.get('channels', []):
+            if name == data.get('name'):
+                return Channel(
+                    id_=data['id'],
+                    raw=data,
+                    last_update=time.time()
+                )
 
     async def get_channel_info(self, channel_id: str):
         """
@@ -298,8 +307,9 @@ class RTMClient(APICaller):
     :param token: Slack API Token
     :param loop: Event loop to work in, optional.
     """
+
     def __init__(self, token, callback,
-                 *, loop: Optional[asyncio.BaseEventLoop]=None,
+                 *, loop: Optional[asyncio.BaseEventLoop] = None,
                  session: aiohttp.ClientSession = None):
 
         super().__init__(token, loop=loop, session=session)

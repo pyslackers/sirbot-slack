@@ -4,7 +4,7 @@ import re
 import aiohttp
 
 from .hookimpl import hookimpl
-from .message import Attachment, Field, Button
+from .message import Attachment, Field, Button, Select
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -16,7 +16,7 @@ async def react(message, slack, _, facade):
     React to any message containing 'sirbot' with a robot face reaction
     """
     reaction = 'robot_face'
-    await slack.add_reaction([message.incoming, reaction])
+    await slack.add_reaction([message, reaction])
 
 
 # Example quote of the day plugin
@@ -41,15 +41,16 @@ async def quote_of_the_day(message, slack, _, facade):
 
     Query theysaidso.com API and create of message with an Attachment
     """
-    message.text = 'Looking for it...'
-    await slack.send(message)
+    response = message.response()
+    response.text = 'Looking for it...'
+    await slack.send(response)
 
     try:
         quote, author, image = await get_quote_of_the_day()
     except Exception:
-        message.text = '''Sorry. I couldn't find it.'''
+        response.text = '''Sorry. I couldn't find it.'''
     else:
-        message.text = ''
+        response.text = ''
         google_url = 'http://www.google.com/search?q={}'
         attachment = Attachment(fallback='The quote of the day',
                                 text='_{}_'.format(quote),
@@ -58,9 +59,9 @@ async def quote_of_the_day(message, slack, _, facade):
                                 footer='theysaidso.com',
                                 color='good',
                                 thumb_url=image)
-        message.attachments.append(attachment)
+        response.content.attachments.append(attachment)
     finally:
-        await slack.update(message)
+        await slack.update(response)
 
 
 async def test_message(message, slack, _, facade):
@@ -72,10 +73,10 @@ async def test_message(message, slack, _, facade):
     Confirmation for the 'danger' button
     Change the username/avatar of the bot
     """
-
-    message.text = 'A beautiful message'
-    message.username = 'BOT'
-    message.icon = ':tada:'
+    response = message.response()
+    response.text = 'A beautiful message'
+    response.content.username = 'BOT'
+    response.content.icon = ':tada:'
     att = Attachment(title='Carter',
                      fallback='A test attachment',
                      image_url='http://imgs.xkcd.com/comics/twitter_bot.png',
@@ -87,18 +88,33 @@ async def test_message(message, slack, _, facade):
     f3 = Field(title='Field3', value=f3_str * 3)
     att.fields += f1, f2, f3
 
-    b1 = Button(name='b1', text='Bonjour', style='primary')
-    b2 = Button(name='b2', text='Hello')
+    b1 = Button(name='b1', text='Bonjour', style='primary', value='bonjour')
+    b2 = Button(name='b2', text='Hello', value='hello')
     confirm = {'title': 'Are you sure?',
                'text': 'DANGER DANGER DANGER !!!',
                'ok_text': 'Yes',
                'dismiss_text': 'No'}
-    b3 = Button(name='b3', text='Danger', style='danger', confirm=confirm)
+    b3 = Button(name='b3', text='Danger', style='danger', confirm=confirm,
+                value='danger')
 
-    att.actions += b1, b2, b3
+    m1_options = [
+        {
+            'text': 'First choice',
+            'value': 1
+        },
+        {
+            'text': 'Second choice',
+            'value': 2
+        }
+    ]
 
-    message.attachments.append(att)
-    await slack.send(message)
+    m1 = Select(name='m1', text='Make a choice', options=m1_options)
+    m2 = Select(name='m2', text='Choose a channel', data_source='channels')
+
+    att.actions = [b1, b2, b3, m1, m2]
+
+    response.content.attachments.append(att)
+    await slack.send(response)
 
 
 async def hello_world(msg, *_):
@@ -110,18 +126,20 @@ async def test(msg, slack, *_):
 
 
 async def parrot(message, slack, facades, *_):
-    message.text = 'Send stop to stop the parrot'
-    await slack.send(message)
+    response = message.response()
+    response.text = 'Send stop to stop the parrot'
+    await slack.send(response)
 
     return {'func': parrot_next}
 
 
 async def parrot_next(message, slack, facades, *_):
-    if message.incoming.text != 'stop':
-        previous = await slack.conversation(message.incoming, limit=1)
-        message.text = 'Your previous message was: `{}`'.format(
+    if message.text != 'stop':
+        response = message.response()
+        previous = await slack.conversation(message, limit=1)
+        response.text = 'Your previous message was: `{}`'.format(
             previous[0].text)
-        await slack.send(message)
+        await slack.send(response)
 
         return {'func': parrot_next}
 

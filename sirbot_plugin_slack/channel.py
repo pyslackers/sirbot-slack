@@ -1,4 +1,6 @@
 import logging
+import time
+import json
 
 from .hookimpl import hookimpl
 
@@ -10,14 +12,73 @@ class Channel:
     Class representing a slack channel.
     """
 
-    def __init__(self, id_, name, is_member=False, is_archived=False):
+    def __init__(self, id_, raw=None, last_update=None):
         """
         :param name: name of the channel
         """
+
+        if not raw:
+            raw = dict()
+
         self.id = id_
-        self.name = name
-        self.is_member = is_member
-        self.is_archived = is_archived
+        self._raw = raw
+        self._last_update = last_update
+
+    @property
+    def name(self):
+        return self._raw.get('name')
+
+    @name.setter
+    def name(self, _):
+        raise NotImplemented
+
+    @property
+    def member(self):
+        return self._raw.get('is_member', False)
+
+    @member.setter
+    def member(self, _):
+        raise NotImplemented
+
+    @property
+    def members(self):
+        return self._raw.get('members')
+
+    @members.setter
+    def members(self, _):
+        raise NotImplemented
+
+    @property
+    def topic(self):
+        return self._raw.get('topic')
+
+    @topic.setter
+    def topic(self, _):
+        raise NotImplemented
+
+    @property
+    def purpose(self):
+        return self._raw.get('purpose')
+
+    @purpose.setter
+    def purpose(self, _):
+        raise NotImplemented
+
+    @property
+    def archived(self):
+        return self._raw.get('is_archived', False)
+
+    @archived.setter
+    def archived(self, _):
+        raise NotImplemented
+
+    @property
+    def raw(self):
+        return self._raw
+
+    @raw.setter
+    def raw(self, _):
+        raise NotImplemented
 
     @property
     def send_id(self):
@@ -25,7 +86,15 @@ class Channel:
 
     @send_id.setter
     def send_id(self, _):
-        raise ValueError('Read only property')
+        raise NotImplementedError
+
+    @property
+    def last_update(self):
+        return self._last_update
+
+    @last_update.setter
+    def last_update(self, _):
+        raise NotImplemented
 
 
 class SlackChannelManager:
@@ -37,7 +106,6 @@ class SlackChannelManager:
         self._client = client
         self._facades = facades
         self._channels = dict()
-        self._names = dict()
 
     async def add(self, channel):
         """
@@ -46,10 +114,9 @@ class SlackChannelManager:
         db = self._facades.get('database')
         await db.execute(
             '''INSERT OR REPLACE INTO slack_channels (id, name, is_member,
-             is_archived) VALUES (?, ?, ?, ?)''', (channel.id,
-                                                   channel.name,
-                                                   channel.is_member,
-                                                   channel.is_archived)
+             is_archived, raw, last_update) VALUES (?, ?, ?, ?, ?, ?)''',
+            (channel.id, channel.name, channel.member, channel.archived,
+             json.dumps(channel.raw), channel.last_update)
         )
         await db.commit()
 
@@ -68,43 +135,40 @@ class SlackChannelManager:
 
         db = self._facades.get('database')
         if name:
-            await db.execute('''SELECT id, name, is_member, is_archived FROM
-                                 slack_channels WHERE name = ?''', (name,)
+            await db.execute('''SELECT id, raw, last_update FROM slack_channels
+                                WHERE name = ?''',
+                             (name,)
                              )
             data = await db.fetchone()
         elif id_:
-            await db.execute('''SELECT id, name, is_member, is_archived FROM
-                                 slack_channels WHERE id = ?''', (id_,)
+            await db.execute('''SELECT id, raw, last_update FROM slack_channels
+                                WHERE id = ?''',
+                             (id_,)
                              )
             data = await db.fetchone()
 
-        if not data:
+        if data is None or data['last_update'] < (time.time() - 3600)\
+                or update:
             logger.debug('Channel not found in the channel manager. '
                          'Querying the Slack API')
             if id_:
                 data = await self._client.get_channel_info(id_)
-                channel = Channel(id_=id_,
-                                  name=data['name'],
-                                  is_member=data['is_member'],
-                                  is_archived=data['is_archived'])
-                self.add(channel)
+                channel = Channel(
+                    id_=data['id'],
+                    raw=data,
+                    last_update=time.time()
+                )
+                await self.add(channel)
                 return channel
             else:
-                _, channels = self._client.get_channels()
-                for channel in channels:
-                    if channel.name == name:
-                        self.add(channel)
-                        return channel
-                return
+                channel = await self._client.find_channel(name)
+                await self.add(channel)
         else:
-            channel = Channel(id_=data['id'],
-                              name=data['name'],
-                              is_member=data['is_member'],
-                              is_archived=data['is_archived'])
-
-        if update:
-            data = await self._client.get_channel_info(id_)
-            channel.slack_data = data
+            channel = Channel(
+                id_=data['id'],
+                raw=json.loads(data['raw']),
+                last_update=data['last_update']
+            )
 
         return channel
 
@@ -122,24 +186,12 @@ class SlackChannelManager:
         await db.commit()
 
 
-def retrieve_channel_id(msg):
-    try:
-        channel_id = msg['channel'].get('id')
-    except AttributeError:
-        channel_id = msg['channel']
-    return channel_id
-
-
 async def channel_archive(event, slack, facades):
     """
     Use the channel archive event to delete the channel
     from the ChannelManager
     """
-    db = facades.get('database')
-    channel_id = retrieve_channel_id(event)
-    await db.execute('''UPDATE slack_channels SET is_archived = 1 WHERE
-                      id = ?''', (channel_id, ))
-    await db.commit()
+    await slack.channels.get(event['channel'], update=True)
 
 
 async def channel_created(event, slack, facades):
@@ -147,14 +199,7 @@ async def channel_created(event, slack, facades):
     Use the channel created event to add the channel
     to the ChannelManager
     """
-    channel_id = retrieve_channel_id(event)
-    channel = Channel(
-        id_=channel_id,
-        name=event['channel']['name'],
-        is_member=event['channel']['is_member'],
-        is_archived=event['channel']['is_archived']
-    )
-    await slack.channels.add(channel)
+    await slack.channels.get(event['channel']['id'])
 
 
 async def channel_deleted(event, slack, facades):
@@ -162,30 +207,26 @@ async def channel_deleted(event, slack, facades):
     Use the channel delete event to delete the channel
     from the ChannelManager
     """
-    channel_id = retrieve_channel_id(event)
-    await slack.channels.delete(channel_id)
+    await slack.channels.delete(event['channel'])
 
 
 async def channel_joined(event, slack, facades):
     """
     Use the channel joined event to update the channel status
     """
-    db = facades.get('database')
-    channel_id = retrieve_channel_id(event)
-    await db.execute('''UPDATE slack_channels SET is_member = 1 WHERE
-                      id = ?''', (channel_id,))
-    await db.commit()
+    channel = Channel(
+        id_=event['channel']['id'],
+        raw=event['channel'],
+        last_update=time.time()
+    )
+    await slack.channels.add(channel)
 
 
 async def channel_left(event, slack, facades):
     """
     Use the channel left event to update the channel status
     """
-    db = facades.get('database')
-    channel_id = retrieve_channel_id(event)
-    await db.execute('''UPDATE slack_channels SET is_member = 0 WHERE
-                      id = ?''', (channel_id,))
-    await db.commit()
+    await slack.channels.get(event['channel'], update=True)
 
 
 async def channel_rename(event, slack, facades):
@@ -193,11 +234,7 @@ async def channel_rename(event, slack, facades):
     User the channel rename event to update the name
     of the channel
     """
-    db = facades.get('database')
-    channel_id = retrieve_channel_id(event)
-    await db.execute('''UPDATE slack_channels SET name = ? WHERE id = ?
-                      ''', (event['channel']['name'], channel_id))
-    await db.commit()
+    await slack.channels.get(event['channel']['id'], update=True)
 
 
 async def channel_unarchive(event, slack, facades):
@@ -205,11 +242,7 @@ async def channel_unarchive(event, slack, facades):
     Use the channel unarchive event to delete the channel
     from the ChannelManager
     """
-    db = facades.get('database')
-    channel_id = retrieve_channel_id(event)
-    await db.execute('''UPDATE slack_channels SET is_archived = 0 WHERE
-                      id = ?''', (channel_id,))
-    await db.commit()
+    await slack.channels.get(event['channel'], update=True)
 
 
 @hookimpl

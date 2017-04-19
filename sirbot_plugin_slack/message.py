@@ -1,7 +1,6 @@
 import json
 import logging
 
-from .channel import Channel
 from .errors import SlackMessageError
 from .user import User
 
@@ -9,39 +8,43 @@ logger = logging.getLogger('sirbot.slack')
 
 
 class SlackMessage:
-    def __init__(self, to, timestamp=None, frm=None, mention=False, text='',
-                 raw=None, incoming=None, subtype='message',
-                 conversation_id=None, content=None):
+    def __init__(self, to, frm=None, mention=False, text='', subtype='message',
+                 conversation=None, content=None, timestamp=None, raw=None):
 
-        if raw is None:
-            raw = dict()
-
-        if conversation_id is None:
-            conversation_id = timestamp
-
-        self.timestamp = timestamp
         self.to = to
         self.frm = frm
         self.mention = mention
-        self.raw = raw
-        self.incoming = incoming
         self.subtype = subtype
-        self.conversation_id = conversation_id
+        self.timestamp = timestamp
+        self.conversation = conversation
+        self.raw = raw
+
         self.content = content or SlackContent()
+        self.content.text = text
 
-        self.as_user = True
+    @property
+    def text(self):
+        return self.content.text
 
-        if text:
-            self.content.data['text'] = text
+    @text.setter
+    def text(self, text):
+        self.content.text = text
+
+    @property
+    def attachments(self):
+        return self.content.attachments
+
+    @attachments.setter
+    def attachments(self, attachments):
+        self.content.attachments = attachments
 
     def serialize(self):
         data = self.content.serialize()
-        if data.get('text') is False and data.get('attachments') is None:
-            logger.warning('Message must have text or an attachments')
-            raise SlackMessageError('No text or attachments')
         data['channel'] = self.to.send_id
-        data['ts'] = self.timestamp
-        data['as_user'] = self.as_user
+
+        if self.timestamp:
+            data['ts'] = self.timestamp
+
         return data
 
     def response(self):
@@ -49,16 +52,14 @@ class SlackMessage:
         if isinstance(self.to, User):
             rep = SlackMessage(
                 to=self.frm,
-                incoming=self,
-                timestamp=self.timestamp,
-                conversation_id=self.conversation_id
+                mention=False,
+                conversation=self.conversation
             )
         else:
             rep = SlackMessage(
                 to=self.to,
-                incoming=self,
-                timestamp=self.timestamp,
-                conversation_id=self.conversation_id
+                mention=False,
+                conversation=self.conversation
             )
 
         return rep
@@ -68,85 +69,13 @@ class SlackMessage:
         Clone the message except the content
         :return: Message
         """
-        return SlackMessage(to=self.to, timestamp=self.timestamp,
-                            frm=self.frm, mention=self.mention,
-                            incoming=self.incoming, subtype=self.subtype,
-                            conversation_id=self.conversation_id
-                            )
-
-    @property
-    def text(self):
-        return self.content.data['text']
-
-    @text.setter
-    def text(self, text):
-        self.content.data['text'] = text
-
-    @property
-    def attachments(self):
-        """
-        Attachments of the Message
-        Shortcut to access 'self.content.attachments'
-        """
-        return self.content.attachments
-
-    @property
-    def username(self) -> str:
-        """
-        Username used by the bot for this message if not default
-
-        Shortcut to access 'self.content.data['username']'
-        """
-        return self.content.data['username']
-
-    @username.setter
-    def username(self, username: str):
-        """
-        Change the username of the bot for this message only.
-
-        The as_user variable must be set to False.
-        """
-        self.content.data['as_user'] = False
-        self.content.data['username'] = username
-
-    @property
-    def icon(self) -> str:
-        """
-        Icon used by the bot for this message if not default
-
-        Shortcut to access 'self.content.data['icon_emoji']'
-        or 'self.content.data['icon_url']'.
-        If both value are set 'icon_emoji' is used first by the
-        Slack API.
-        """
-        return self.content.data['icon_emoji'] or self.content.data['icon_url']
-
-    @icon.setter
-    def icon(self, icon: str):
-        """
-        Change the avatar of the bot for this message only.
-
-        Change the bot avatar to an emoji or url to an image
-        (See Slack API documentation for more information
-        about the image size)
-        The username attribute must be set for this to work.
-
-        :param icon: emoji or url to use
-        :type icon: str
-        """
-        if icon.startswith(':'):
-            self.content.data['icon_emoji'] = icon
-        else:
-            self.content.data['icon_emoji'] = None
-            self.content.data['icon_url'] = icon
-
-    @property
-    def is_direct_msg(self) -> bool:
-        return isinstance(self.to, User)
-
-    @property
-    def is_channel_msg(self):
-        return isinstance(self.to, Channel)
+        return SlackMessage(
+            to=self.to,
+            frm=self.frm,
+            mention=self.mention,
+            subtype=self.subtype,
+            conversation=self.conversation
+        )
 
     @classmethod
     async def from_raw(cls, data, slack):
@@ -158,46 +87,93 @@ class SlackMessage:
         timestamp = data.get('ts') or data.get('message', {}).get('ts')
         subtype = data.get('subtype') or data.get('message', {}).get('subtype',
                                                                      'message')
+        if subtype == 'message_changed':
+            timestamp = data.get('message', {}).get('ts', timestamp)
 
-        frm = await slack.users.get(user_id)
+        if user_id:
+            frm = await slack.users.get(user_id)
+        else:
+            bot_id = data.get('bot_id')\
+                or data.get('message', {}).get('bot_id')
+
+            if bot_id == slack.bot.bot_id:
+                frm = slack.bot
+            else:
+                frm = None
 
         if channel_id.startswith('D'):
-            # TODO: Create a bot user to use when msg to bot
             mention = True
             to = slack.bot
         else:
             mention = False
             to = await slack.channels.get(channel_id)
 
-        if text.startswith(slack.bot.name):
-            text = text[len(slack.bot.name):].strip()
+        if slack.bot.id in text:
             mention = True
+            bot_link = '<@{}>'.format(slack.bot.id)
+            if text.startswith(bot_link):
+                text = text[len(bot_link):].strip()
+
+        content = SlackContent(
+            text=text
+        )
 
         message = SlackMessage(
-            timestamp=timestamp,
             mention=mention,
             to=to,
             frm=frm,
             text=text,
             subtype=subtype,
-            raw=data,
-            conversation_id=timestamp
+            conversation=timestamp,
+            timestamp=timestamp,
+            content=content,
+            raw=data
         )
 
         return message
 
 
 class SlackContent:
-    def __init__(self):
-        self.attachments = list()
-        self.data = dict()
+    def __init__(self, text='', attachments=None, username=None, icon=None,
+                 markdown=True):
+        if attachments is None:
+            attachments = list()
+
+        self.attachments = attachments
+        self.text = text
+        self.username = username
+        self.icon = icon
+        self.markdown = markdown
 
     def serialize(self):
-        self.data['attachments'] = list()
-        for attachment in self.attachments:
-            self.data['attachments'].append(attachment.serialize())
-        self.data['attachments'] = json.dumps(self.data['attachments'])
-        return self.data
+        data = dict()
+
+        if not self.text and not self.attachments:
+            raise SlackMessageError('No text or attachments')
+
+        if self.text:
+            data['text'] = self.text
+
+        if self.attachments:
+            attachments = [attachment.serialize() for attachment in
+                           self.attachments]
+            data['attachments'] = json.dumps(attachments)
+
+        if self.username:
+            data['as_user'] = False
+            data['username'] = self.username
+        else:
+            data['as_user'] = True
+
+        if self.icon:
+            if self.icon.startswith(':'):
+                data['icon_emoji'] = self.icon
+            else:
+                data['icon_url'] = self.icon
+
+        data['mrkdwn'] = self.markdown
+
+        return data
 
 
 class Attachment:
@@ -209,118 +185,101 @@ class Attachment:
     attachments.
     """
 
-    def __init__(self, fallback, **kwargs):
+    def __init__(self, fallback, text='', markdown=None, fields=None,
+                 actions=None, color=None, pretext='', author_name='',
+                 author_link='', author_icon='', title='', title_link='',
+                 image_url=None, thumb_url=None, footer='', footer_icon=None,
+                 timestamp=None, callback_id=None):
         """
         :param fallback: String displayed if the client can not display
         attachments
         """
-        self.data = {'mrkdwn_in': ["pretext", "text", "fields"],
-                     'fallback': fallback}
-        self.fields = list()
-        self.actions = list()
-        self._add(**kwargs)
+        if not markdown:
+            markdown = ['pretext', 'text', 'fields']
 
-    def _add(self, **kwargs):
-        for item, value in kwargs.items():
-            self.data[item] = value
+        if not fields:
+            fields = list()
 
-    def serialize(self):
-        self.data['fields'] = list()
-        self.data['actions'] = list()
-        for field in self.fields:
-            self.data['fields'].append(field.serialize())
-        for action in self.actions:
-            self.data['actions'].append(action.serialize())
-        return self.data
+        if not actions:
+            actions = list()
 
+        self.text = text
+        self.markdown = markdown
+        self.fallback = fallback
+        self.color = color
+        self.pretext = pretext
+        self.author_name = author_name
+        self.author_link = author_link
+        self.author_icon = author_icon
+        self.title = title
+        self.title_link = title_link
+        self.image_url = image_url
+        self.thumb_url = thumb_url
+        self.footer = footer
+        self.footer_icon = footer_icon
+        self.timestamp = timestamp
+        self.callback_id = callback_id
 
-class _Action:
-    """
-    Class representing an action in an Attachment.
-
-    Only one type of action (Button) exist at the moment.
-    See Slack API documentation for more information about
-    actions.
-    """
-
-    def __init__(self, name, text, type_, **kwargs):
-        """
-        :param name: Name of the action. Sent to the callback url
-        :param text: User facing text
-        :param type_: Type of action. Only 'button' available
-        """
-        self.data = {'name': name, 'text': text, 'type': type_}
-        self._add(**kwargs)
-
-    def _add(self, **kwargs):
-        for item, value in kwargs.items():
-            self.data[item] = value
+        self.fields = fields
+        self.actions = actions
 
     def serialize(self):
-        return self.data
 
-    @property
-    def text(self):
-        """
-        User facing label
-        """
-        return self.data['text']
+        data = {
+            'fallback': self.fallback,
+            'mrkdwn_in': self.markdown,
+            'attachment_type': 'default'
+        }
 
-    @text.setter
-    def text(self, value):
-        self.data['text'] = value
+        if self.text:
+            data['text'] = self.text
 
-    @property
-    def style(self):
-        """
-        Style of the action.
+        if self.color:
+            data['color'] = self.color
 
-        Currently available: 'default', 'primary', 'danger'
-        See Slack API documentation for more information
-        """
-        return self.data['style']
+        if self.pretext:
+            data['pretext'] = self.pretext
 
-    @style.setter
-    def style(self, value):
-        self.data['style'] = value
+        if self.author_name:
+            data['author_name'] = self.author_name
 
-    @property
-    def value(self):
-        """
-        String identifying the specific action.
+            if self.author_icon:
+                data['author_icon'] = self.author_icon
 
-        Sent to the callback url alongside 'name' and 'callback_id'
-        See Slack API documentation for more information
-        """
-        return self.data['value']
+            if self.author_link:
+                data['author_link'] = self.author_link
 
-    @value.setter
-    def value(self, value):
-        self.data['value'] = value
+        if self.title:
+            data['title'] = self.title
 
-    @property
-    def confirm(self):
-        """
-        JSON used to display a confirmation message.
+            if self.title_link:
+                data['title_link'] = self.title_link
 
-        See Slack API documentation for more information
-        """
-        return self.data['confirm']
+        if self.image_url:
+            data['image_url'] = self.image_url
 
-    @confirm.setter
-    def confirm(self, value):
-        self.data['confirm'] = value
+        if self.thumb_url:
+            data['thumb_url'] = self.thumb_url
 
+        if self.footer:
+            data['footer'] = self.footer
 
-class Button(_Action):
-    """
-    Subclass of action representing a button.
+            if self.footer_icon:
+                data['footer_icon'] = self.footer_icon
 
-    See Slack API documentation for more information.
-    """
+        if self.timestamp:
+            data['ts'] = self.timestamp
 
-    def __init__(self, name, text, **kwargs):
-        super().__init__(name=name, text=text, type_='button', **kwargs)
+        if self.callback_id:
+            data['callback_id'] = self.callback_id
+
+        if self.fields:
+            data['fields'] = [field.serialize() for field in self.fields]
+
+        if self.actions:
+            data['actions'] = [action.serialize() for action in self.actions]
+
+        return data
 
 
 class Field:
@@ -330,50 +289,119 @@ class Field:
     See slack API documentation for more information.
     """
 
-    def __init__(self, **kwargs):
-        self.data = dict()
-        self._add(**kwargs)
-
-    def _add(self, **kwargs):
-        for item, value in kwargs.items():
-            self.data[item] = value
-
-    @property
-    def title(self):
-        return self.data['title']
-
-    @title.setter
-    def title(self, value):
-        self.data['title'] = value
-
-    @property
-    def value(self):
-        """
-        Text/Value to show
-        """
-        return self.data['value']
-
-    @value.setter
-    def value(self, value):
-        self.data['value'] = value
-
-    @property
-    def short(self):
-        """
-        Display fields side by side
-
-        Specify if the fields is short enough to be displayed side by side
-        in the Attachment.
-        """
-        return self.data['short']
-
-    @short.setter
-    def short(self, value):
-        self.data['short'] = value
-
-    @short.deleter
-    def short(self):
-        self.data.pop('short', None)
+    def __init__(self, title, value, short=False):
+        self.title = title
+        self.value = value
+        self.short = short
 
     def serialize(self):
-        return self.data
+        data = {
+            'title': self.title,
+            'value': self.value,
+            'short': self.short
+        }
+
+        return data
+
+
+class _Action:
+    """
+    Class representing an action in an Attachment.
+
+    See Slack API documentation for more information about
+    actions.
+    """
+
+    def __init__(self, type_, name, text=''):
+        self.type_ = type_
+        self.name = name
+        self.text = text
+
+    def serialize(self):
+        data = {
+            'type': self.type_,
+            'name': self.name,
+            'text': self.text
+        }
+
+        return data
+
+
+class Button(_Action):
+    """
+    Subclass of action representing a button.
+
+    See Slack API documentation for more information.
+    """
+
+    def __init__(self, name, value, text='', style=None, confirm=None):
+
+        if not confirm:
+            confirm = dict()
+
+        super().__init__(type_='button', name=name, text=text)
+
+        self.value = value
+        self.confirm = confirm
+        self.style = style
+
+    def serialize(self):
+        data = super().serialize()
+
+        data['value'] = self.value
+
+        if self.confirm:
+            data['confirm'] = self.confirm
+
+        if self.style:
+            data['style'] = self.style
+
+        return data
+
+
+class Select(_Action):
+    """
+    Subclass of action representing a menu.
+
+    See Slack API documentation for more information.
+    """
+
+    def __init__(self, name, text='', options=None, data_source='static',
+                 option_groups=None, selected_options=None,
+                 min_query_lenght=1):
+
+        if not options:
+            options = list()
+
+        if not option_groups:
+            option_groups = list()
+
+        if not selected_options:
+            selected_options = list()
+
+        super().__init__(type_='select', name=name, text=text)
+
+        self.data_source = data_source
+        self.options = options
+        self.option_groups = option_groups
+        self.selected_options = selected_options
+        self.min_query_length = min_query_lenght
+
+    def serialize(self):
+        data = super().serialize()
+
+        data['data_source'] = self.data_source
+
+        if self.data_source == 'static':
+
+            if self.option_groups:
+                data['option_groups'] = self.option_groups
+            else:
+                data['options'] = self.options
+        elif self.data_source == 'external':
+            data['min_query_length'] = self.min_query_length
+
+        if self.selected_options:
+            data['selected_options'] = self.selected_options
+
+        return data
