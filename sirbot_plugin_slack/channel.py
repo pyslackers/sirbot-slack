@@ -33,16 +33,17 @@ class SlackChannelManager:
     Manager for the slack channels
     """
 
-    def __init__(self, client):
+    def __init__(self, client, facades):
         self._client = client
+        self._facades = facades
         self._channels = dict()
         self._names = dict()
 
-    async def add(self, channel, *, db):
+    async def add(self, channel):
         """
         Add a channel to the channel manager
         """
-
+        db = self._facades.get('database')
         await db.execute(
             '''INSERT OR REPLACE INTO slack_channels (id, name, is_member,
              is_archived) VALUES (?, ?, ?, ?)''', (channel.id,
@@ -50,8 +51,9 @@ class SlackChannelManager:
                                                    channel.is_member,
                                                    channel.is_archived)
         )
+        await db.commit()
 
-    async def get(self, id_=None, name=None, update=True, *, db):
+    async def get(self, id_=None, name=None, update=False):
         """
         Return a Channel from the Channel Manager
 
@@ -63,7 +65,9 @@ class SlackChannelManager:
         data = dict()
         if not id_ and not name:
             raise SyntaxError('id_ or name must be supplied')
-        elif name:
+
+        db = self._facades.get('database')
+        if name:
             await db.execute('''SELECT id, name, is_member, is_archived FROM
                                  slack_channels WHERE name = ?''', (name,)
                              )
@@ -83,13 +87,13 @@ class SlackChannelManager:
                                   name=data['name'],
                                   is_member=data['is_member'],
                                   is_archived=data['is_archived'])
-                self.add(channel, db=db)
+                self.add(channel)
                 return channel
             else:
                 _, channels = self._client.get_channels()
                 for channel in channels:
                     if channel.name == name:
-                        self.add(channel, db=db)
+                        self.add(channel)
                         return channel
                 return
         else:
@@ -104,7 +108,7 @@ class SlackChannelManager:
 
         return channel
 
-    async def delete(self, id_, *, db):
+    async def delete(self, id_):
         """
         Delete a channel from the channel manager
 
@@ -112,8 +116,10 @@ class SlackChannelManager:
         :param name: name of the channel
         :return: None
         """
+        db = self._facades.get('database')
         await db.execute('''DELETE FROM slack_channels WHERE id = ?
                           ''', (id_,))
+        await db.commit()
 
 
 def retrieve_channel_id(msg):
@@ -141,7 +147,6 @@ async def channel_created(event, slack, facades):
     Use the channel created event to add the channel
     to the ChannelManager
     """
-    db = facades.get('database')
     channel_id = retrieve_channel_id(event)
     channel = Channel(
         id_=channel_id,
@@ -149,8 +154,7 @@ async def channel_created(event, slack, facades):
         is_member=event['channel']['is_member'],
         is_archived=event['channel']['is_archived']
     )
-    await slack.channels.add(channel, db=db)
-    await db.commit()
+    await slack.channels.add(channel)
 
 
 async def channel_deleted(event, slack, facades):
@@ -158,10 +162,8 @@ async def channel_deleted(event, slack, facades):
     Use the channel delete event to delete the channel
     from the ChannelManager
     """
-    db = facades.get('database')
     channel_id = retrieve_channel_id(event)
     await slack.channels.delete(channel_id)
-    await db.commit()
 
 
 async def channel_joined(event, slack, facades):

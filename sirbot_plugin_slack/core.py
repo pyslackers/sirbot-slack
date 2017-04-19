@@ -56,11 +56,15 @@ class SirBotSlack(Plugin):
             raise EnvironmentError(
                 'SIRBOT_SLACK_TOKEN environment variable is not set')
 
-        self._http_client = HTTPClient(token=self._token, loop=self._loop,
+        self._http_client = HTTPClient(token=self._token,
+                                       loop=self._loop,
                                        session=self._session)
-        self._users = SlackUserManager(self._http_client)
-        self._channels = SlackChannelManager(self._http_client)
+        self._users = SlackUserManager(client=self._http_client,
+                                       facades=self._facades)
+        self._channels = SlackChannelManager(client=self._http_client,
+                                             facades=self._facades)
         pm = self._initialize_plugins()
+
         self._dispatcher = SlackMainDispatcher(
             http_client=self._http_client,
             users=self._users,
@@ -81,8 +85,11 @@ class SirBotSlack(Plugin):
         This is called by the core when a for each incoming message and when
         another plugin request a slack facade
         """
-        return SlackFacade(self._http_client, self._users,
-                           self._channels, self._dispatcher.bot_id)
+        return SlackFacade(http_client=self._http_client,
+                           users=self._users,
+                           channels=self._channels,
+                           bot=self._dispatcher.bot,
+                           facades=self._facades)
 
     async def start(self):
         logger.debug('Starting slack plugin')
@@ -185,14 +192,13 @@ class SirBotSlack(Plugin):
 
         await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
         ts REAL,
-        channel TEXT,
-        user TEXT,
-        text TEXT,
+        from_id TEXT,
+        to_id TEXT,
         type TEXT,
-        attachment INT,
-        raw TEXT,
         conversation_id REAL,
-        PRIMARY KEY (ts, channel)
+        text TEXT,
+        raw TEXT,
+        PRIMARY KEY (ts, from_id)
         )
         ''')
 

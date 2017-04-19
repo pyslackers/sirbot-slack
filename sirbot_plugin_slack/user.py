@@ -30,21 +30,24 @@ class SlackUserManager:
     Manager for the user object
     """
 
-    def __init__(self, client):
+    def __init__(self, client, facades):
         self._client = client
+        self._facades = facades
 
-    async def add(self, user, *, db):
+    async def add(self, user):
         """
         Add an user to the UserManager
 
         :param user: users to add
         """
+        db = self._facades.get('database')
         await db.execute(
             '''INSERT OR REPLACE INTO slack_users (id, dm_id, admin)
              VALUES (?, ? ,?)''',
             (user.id, user.dm_id, user.admin))
+        await db.commit()
 
-    async def get(self, id_, dm=False, update=True, *, db):
+    async def get(self, id_, dm=False, update=False):
         """
         Return an User from the User Manager
 
@@ -56,6 +59,7 @@ class SlackUserManager:
         :return: User
         """
         if id_.startswith('U'):
+            db = self._facades.get('database')
             await db.execute('''SELECT id, dm_id, admin
                                  FROM
                                  slack_users
@@ -70,7 +74,7 @@ class SlackUserManager:
                 data = await self._client.get_user_info(id_)
                 user = User(id_=data['id'], dm_id=data.get('dm_channel_id'),
                             admin=data.get('is_admin', False))
-                await self.add(user, db=db)
+                await self.add(user)
 
             if update:
                 user.slack_data = await self._client.get_user_info(id_)
@@ -82,23 +86,41 @@ class SlackUserManager:
 
             return user
 
-    async def delete(self, id_, db):
+    # async def find_by_dm(self, dm_id):
+    #     db = self._facade.get('database')
+    #     await db.execute('''SELECT * FROM slack_users
+    #                          WHERE dm_id=?''',
+    #                      (dm_id,)
+    #                      )
+    #
+    #     data = await db.fetchone()
+    #     if data:
+    #         user = User(id_=data['id'], dm_id=data.get('dm_channel_id'),
+    #                     admin=data.get('is_admin', False))
+    #     else:
+    #         pass
+    #
+    #     return user
+
+    async def delete(self, id_):
         """
         Delete an user from the UserManager
 
         :param id_: id of the user
         :return: None
         """
+        db = self._facades.get('database')
         await db.execute('''DELETE FROM slack_users WHERE id = ? ''', (id_, ))
+        await db.commit()
 
-    async def preload_user(self, id_, db):
+    async def preload_user(self, id_):
         """
         Make sure the user and his direct message id are cached
 
         :param id_: id of the user
         :return: None
         """
-        await self.get(id_, dm=True, update=False, db=db)
+        await self.get(id_, dm=True, update=False)
 
 
 async def user_typing(event, slack, facades):
@@ -106,7 +128,7 @@ async def user_typing(event, slack, facades):
     Use the user typing event to make sure the user is in cache
     """
     db = facades.get('database')
-    await slack.users.preload_user(id_=event.get('user'), db=db)
+    await slack.users.preload_user(id_=event.get('user'))
     await db.commit()
 
 

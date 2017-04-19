@@ -1,28 +1,38 @@
-import logging
 import json
+import logging
 
-from .__meta__ import DATA as METADATA
-from .user import User
 from .channel import Channel
 from .errors import SlackMessageError
+from .user import User
 
 logger = logging.getLogger('sirbot.slack')
 
 
 class SlackMessage:
-    def __init__(self, timestamp=0, as_user=True, mention=False, text='',
-                 to=None, frm=None, incoming=None):
+    def __init__(self, to, timestamp=None, frm=None, mention=False, text='',
+                 raw=None, incoming=None, subtype='message',
+                 conversation_id=None, content=None):
+
+        if raw is None:
+            raw = dict()
+
+        if conversation_id is None:
+            conversation_id = timestamp
+
         self.timestamp = timestamp
-        self.as_user = as_user
-        self.type = METADATA['name']
-        self.mention = mention
-        self.content = SlackContent()
-        self.text = text
         self.to = to
         self.frm = frm
+        self.mention = mention
+        self.raw = raw
         self.incoming = incoming
-        self.previous = []
-        self.conversation_id = None
+        self.subtype = subtype
+        self.conversation_id = conversation_id
+        self.content = content or SlackContent()
+
+        self.as_user = True
+
+        if text:
+            self.content.data['text'] = text
 
     def serialize(self):
         data = self.content.serialize()
@@ -35,10 +45,22 @@ class SlackMessage:
         return data
 
     def response(self):
-        rep = SlackMessage(to=self.to,
-                           frm=self.frm,
-                           incoming=self,
-                           timestamp=self.timestamp)
+
+        if isinstance(self.to, User):
+            rep = SlackMessage(
+                to=self.frm,
+                incoming=self,
+                timestamp=self.timestamp,
+                conversation_id=self.conversation_id
+            )
+        else:
+            rep = SlackMessage(
+                to=self.to,
+                incoming=self,
+                timestamp=self.timestamp,
+                conversation_id=self.conversation_id
+            )
+
         return rep
 
     def clone(self):
@@ -46,9 +68,11 @@ class SlackMessage:
         Clone the message except the content
         :return: Message
         """
-        return SlackMessage(to=self.to, incoming=self.incoming, frm=self.frm,
-                            timestamp=self.timestamp, mention=self.mention,
-                            as_user=self.as_user)
+        return SlackMessage(to=self.to, timestamp=self.timestamp,
+                            frm=self.frm, mention=self.mention,
+                            incoming=self.incoming, subtype=self.subtype,
+                            conversation_id=self.conversation_id
+                            )
 
     @property
     def text(self):
@@ -123,6 +147,44 @@ class SlackMessage:
     @property
     def is_channel_msg(self):
         return isinstance(self.to, Channel)
+
+    @classmethod
+    async def from_raw(cls, data, slack):
+
+        text = data.get('text') or data.get('message', {}).get('text', '')
+        user_id = data.get('user') or data.get('message', {}).get('user')
+        channel_id = data.get('channel') or data.get('message', {}).get(
+            'channel')
+        timestamp = data.get('ts') or data.get('message', {}).get('ts')
+        subtype = data.get('subtype') or data.get('message', {}).get('subtype',
+                                                                     'message')
+
+        frm = await slack.users.get(user_id)
+
+        if channel_id.startswith('D'):
+            # TODO: Create a bot user to use when msg to bot
+            mention = True
+            to = slack.bot
+        else:
+            mention = False
+            to = await slack.channels.get(channel_id)
+
+        if text.startswith(slack.bot.name):
+            text = text[len(slack.bot.name):].strip()
+            mention = True
+
+        message = SlackMessage(
+            timestamp=timestamp,
+            mention=mention,
+            to=to,
+            frm=frm,
+            text=text,
+            subtype=subtype,
+            raw=data,
+            conversation_id=timestamp
+        )
+
+        return message
 
 
 class SlackContent:
