@@ -5,6 +5,7 @@ core:
 sirbot_plugin_slack:
   save:
     message: true
+    events: true
   plugins:
     - sirbot_plugin_slack.example
 database:

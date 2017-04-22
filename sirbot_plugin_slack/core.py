@@ -131,54 +131,17 @@ class SirBotSlack(Plugin):
 
     async def database_update(self, metadata, db):
 
-        if metadata['version'] == '0.0.1':
-            await db.execute(
-                '''ALTER TABLE slack_messages ADD COLUMN type TEXT''')
-            metadata['version'] = '0.0.2'
-
-        if metadata['version'] == '0.0.2':
-            await db.execute(
-                '''ALTER TABLE slack_messages ADD COLUMN attachment INT''')
-            metadata['version'] = '0.0.3'
-
-        if metadata['version'] == '0.0.3':
-            await db.execute(
-                '''ALTER TABLE slack_messages ADD COLUMN raw TEXT''')
-            metadata['version'] = '0.0.4'
-
-        if metadata['version'] == '0.0.4':
-            await db.execute('''ALTER TABLE slack_messages
-                                 RENAME TO slack_messages_tmp''')
-
-            await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
-            ts REAL,
-            channel TEXT,
-            user TEXT,
-            text TEXT,
-            type TEXT,
-            attachment INT,
-            raw TEXT,
-            conversation_id REAL,
-            PRIMARY KEY (ts, channel)
-            )
-            ''')
-
-            await db.execute('''INSERT INTO slack_messages(ts, channel, user,
-                                 text, type, attachment, raw)
-                                 SELECT * FROM slack_messages_tmp''')
-
-            await db.execute('''DROP TABLE slack_messages_tmp''')
-
-            metadata['version'] = '0.0.5'
-
         return self.__version__
 
     async def _create_db_table(self):
         db = self._facades.get('database')
+
         await db.execute('''CREATE TABLE IF NOT EXISTS slack_users (
         id TEXT PRIMARY KEY NOT NULL,
         dm_id TEXT,
-        admin BOOLEAN DEFAULT FALSE
+        admin BOOLEAN DEFAULT FALSE,
+        raw TEXT,
+        last_update REAL
         )
         ''')
 
@@ -186,7 +149,9 @@ class SirBotSlack(Plugin):
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT UNIQUE,
         is_member BOOLEAN,
-        is_archived BOOLEAN
+        is_archived BOOLEAN,
+        raw TEXT,
+        last_update REAL
         )
         ''')
 
@@ -195,12 +160,21 @@ class SirBotSlack(Plugin):
         from_id TEXT,
         to_id TEXT,
         type TEXT,
-        conversation_id REAL,
+        conversation REAL,
+        mention BOOLEAN,
         text TEXT,
         raw TEXT,
-        PRIMARY KEY (ts, from_id)
+        PRIMARY KEY (ts, from_id, type)
         )
         ''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_events (
+        ts REAL,
+        from_id TEXT,
+        type TEXT,
+        raw TEXT,
+        PRIMARY KEY (ts, type)
+        )''')
 
         await db.set_plugin_metadata(self)
         await db.commit()

@@ -1,7 +1,9 @@
 import json
 import logging
+import sqlite3
 
 from .message import SlackMessage
+from .user import User
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -29,11 +31,15 @@ class SlackFacade:
         :param messages: Messages to send
         """
         for message in messages:
+
+            if isinstance(message.to, User):
+                await self.users.ensure_dm(message.to)
+
+            if message.content.username:
+                message.subtype = 'bot_message'
+
             message.frm = self.bot
             message.raw = await self._http_client.send(message=message)
-            message.timestamp = message.raw.get('ts')
-            if not message.conversation_id:
-                message.conversation_id = message.timestamp
             await self._save_outgoing_message(message)
 
     async def update(self, *messages):
@@ -43,8 +49,19 @@ class SlackFacade:
         :param messages: Messages to update
         """
         for message in messages:
-            message.timestamp = await self._http_client.update(
-                message=message)
+
+            if isinstance(message.to, User):
+                await self.users.ensure_dm(message.to)
+
+            if message.content.username:
+                message.subtype = 'bot_message'
+
+            message.frm = self.bot
+            message.subtype = 'message_changed'
+            message.raw = await self._http_client.update(message=message)
+            message.ts = message.raw.get('ts')
+
+            await self._save_outgoing_message(message)
 
     async def delete(self, *messages):
         """
@@ -67,6 +84,13 @@ class SlackFacade:
         :param messages: List of message and reaction to add
         """
         for message, reaction in messages:
+
+            if message.to.id == self.bot.id:
+                message.to = message.frm
+
+            if isinstance(message.to, User):
+                await self.users.ensure_dm(message.to)
+
             await self._http_client.add_reaction(message, reaction)
 
     async def delete_reaction(self, *messages):
@@ -132,15 +156,25 @@ class SlackFacade:
         """
         logger.debug('Saving outgoing msg to %s at %s',
                      message.to.id, message.timestamp)
+
+        message.timestamp = message.raw.get('ts')
+        if not message.conversation:
+            message.conversation = message.timestamp
+
         db = self._facades.get('database')
-        await db.execute('''INSERT INTO slack_messages
-                          (ts, from_id, to_id, type, conversation_id, text,
-                           raw)
-                          VALUES (?, ?, ?, ?, ?, ?, ?)
-                          ''',
-                         (message.timestamp, message.frm.id, message.to.id,
-                          message.subtype, message.conversation_id,
-                          message.text, json.dumps(message.raw))
-                         )
+        try:
+            await db.execute('''INSERT INTO slack_messages
+                              (ts, from_id, to_id, type, conversation, mention,
+                              text, raw)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                              ''',
+                             (message.timestamp, message.frm.id, message.to.id,
+                              message.subtype, message.conversation, False,
+                              message.text, json.dumps(message.raw))
+                             )
+        except sqlite3.IntegrityError:
+            await db.execute('''UPDATE slack_messages SET conversation=?
+                                WHERE ts=?''',
+                             (message.conversation, message.timestamp))
 
         await db.commit()

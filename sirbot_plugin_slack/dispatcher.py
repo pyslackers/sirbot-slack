@@ -5,6 +5,7 @@ import inspect
 import json
 import functools
 import time
+import sqlite3
 
 from collections import defaultdict
 from sirbot.utils import ensure_future
@@ -14,6 +15,7 @@ from .__meta__ import DATA as METADATA
 from .message import SlackMessage
 from .user import User
 from .channel import Channel
+
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -85,7 +87,6 @@ class SlackMainDispatcher:
 
         self.bot_id = login_data['self']['id']
         self.bot = await self._users.get(self.bot_id)
-        self.bot.name = '<@{}>'.format(self.bot.id)
 
         self._message_dispatcher = SlackMessageDispatcher(
             users=self._users,
@@ -99,7 +100,8 @@ class SlackMainDispatcher:
 
         self._event_dispatcher = SlackEventDispatcher(
             pm=self._pm,
-            loop=self._loop
+            loop=self._loop,
+            save=self._config.get('save', {}).get('events', [])
         )
 
         self.started = True
@@ -109,11 +111,14 @@ class SlackMainDispatcher:
         Parse the channels at login and add them to the channel manager if
         the bot is in them
         """
+
+        now = time.time()
         for channel in channels:
-            c = Channel(id_=channel['id'],
-                        name=channel['name'],
-                        is_member=channel.get('is_member', False),
-                        is_archived=channel.get('is_archived', False))
+            c = Channel(
+                id_=channel['id'],
+                raw=channel,
+                last_update=now,
+            )
             await self._channels.add(c)
 
     async def _parse_users(self, users):
@@ -121,17 +126,20 @@ class SlackMainDispatcher:
         Parse the users at login and add them in the user manager
         """
         for user in users:
-            u = User(id_=user['id'],
-                     admin=user.get('is_admin', False))
+            u = User(id_=user['id'], raw=user, last_update=time.time())
             await self._users.add(u)
 
 
 class SlackMessageDispatcher:
-    def __init__(self, users, channels, bot, pm, save, facades, *, loop):
+    def __init__(self, users, channels, bot, pm, facades, save=None, *, loop):
+
+        if not save:
+            save = []
+
         self.commands = defaultdict(list)
         self.callbacks = dict()
-
         self.bot = bot
+
         self._users = users
         self._channels = channels
         self._register(pm)
@@ -153,24 +161,29 @@ class SlackMessageDispatcher:
 
         message = await SlackMessage.from_raw(msg, slack_facade)
         db = self._facades.get('database')
-        if message.frm.id == self.bot.id:  # Skip message from self
+
+        if not message.frm:  # Message without frm (i.e: slackbot)
+            return
+        elif message.frm.id == self.bot.id:  # Skip message from self
+            await self._save_update_incoming(message, db)
             return
 
-        if self._save is True:
-            await self._store_incoming(message, db)
+        if isinstance(self._save, list) and message.subtype in self._save\
+                or self._save is True:
+            await self._save_incoming(message, db)
 
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
                     'channel_leave', 'bot_message', 'message_replied']
 
-        if msg.get('subtype') in ignoring:
+        if message.subtype in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
         await self._dispatch(message, slack_facade, facades, db)
 
-    async def _store_incoming(self, message, db):
+    async def _save_incoming(self, message, db):
         """
-        Store incoming message in db
+        Save incoming message in db
 
         :param msg: message
         :param db: db facade
@@ -180,16 +193,39 @@ class SlackMessageDispatcher:
                      message.frm.id, message.to.id, message.timestamp)
 
         await db.execute('''INSERT INTO slack_messages
-                          (ts, from_id, to_id, type, conversation_id, text,
-                           raw)
-                          VALUES (?, ?, ?, ?, ?, ?, ?)
+                          (ts, from_id, to_id, type, conversation, mention,
+                          text, raw)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                           ''',
                          (message.timestamp, message.frm.id, message.to.id,
-                          message.subtype, message.conversation_id,
-                          message.text, json.dumps(message.raw))
+                          message.subtype, message.conversation,
+                          message.mention, message.text,
+                          json.dumps(message.raw))
                          )
 
         await db.commit()
+
+    async def _save_update_incoming(self, message, db):
+        """
+        Update incoming message in db.
+
+        Used for self message saved on sending
+
+        :param message: incoming message
+        :param db: db facade
+        :return: None
+        """
+        logger.debug('Update self incoming msg to %s at %s',
+                     message.to.id, message.timestamp)
+
+        try:
+            await self._save_incoming(message, db)
+        except sqlite3.IntegrityError:
+            await db.execute('''UPDATE slack_messages SET raw=?
+                                WHERE ts=?''',
+                             (json.dumps(message.raw), message.timestamp)
+                             )
+            await db.commit()
 
     def _register(self, pm):
         """
@@ -209,7 +245,8 @@ class SlackMessageDispatcher:
                              msg['match'],
                              msg['func'].__name__,
                              inspect.getabsfile(msg['func']))
-                msg['match'] = msg['match'].format(bot_name=self.bot.name)
+                msg['match'] = msg['match'].format(
+                    bot_name='<@{}>'.format(self.bot.id))
                 self.commands[re.compile(msg['match'],
                                          msg.get('flags', 0))].append(msg)
 
@@ -251,7 +288,7 @@ class SlackMessageDispatcher:
                         handlers.append((command['func'], n))
 
         for func in handlers:
-            f = func[0](msg.response(), slack_facade, facades, func[1])
+            f = func[0](msg, slack_facade, facades, func[1])
             self.ensure_handler(coroutine=f, msg=msg)
 
     def ensure_handler(self, coroutine, msg):
@@ -288,29 +325,23 @@ class SlackMessageDispatcher:
             }
 
     async def _update_conversation_id(self, msg, db):
-        await db.execute('''UPDATE slack_messages SET conversation_id=?
+        await db.execute('''UPDATE slack_messages SET conversation=?
                              WHERE ts=?'''
-                         , (msg.conversation_id, msg.timestamp)
+                         , (msg.conversation, msg.timestamp)
                          )
         await db.commit()
 
-    async def _find_conversation_messages(self, conversation_id, db):
-
-        await db.execute('''SELECT * FROM slack_messages
-                             WHERE conversation_id=? ORDER BY ts DESC''',
-                         (conversation_id,))
-
-        messages = await db.fetchall()
-        logger.debug('{} messages found in the'
-                     ' conversation'.format(len(messages)))
-        return messages
-
 
 class SlackEventDispatcher:
-    def __init__(self, pm, *, loop):
+    def __init__(self, pm, save=None, *, loop):
+
+        if not save:
+            save = list()
+
         self.events = defaultdict(list)
         self._register(pm)
         self._loop = loop
+        self._save = save
 
     async def incoming(self, event_type, event, slack_facade, facades):
         """
@@ -324,6 +355,11 @@ class SlackEventDispatcher:
         :param facades: main facade
         :return: None
         """
+
+        if isinstance(self._save, list) and event_type in self._save \
+                or self._save is True:
+            db = facades.get('database')
+            await self._store_incoming(event_type, event, db)
 
         for func in self.events.get(event_type, list()):
             f = func(event, slack_facade, facades)
@@ -349,3 +385,22 @@ class SlackEventDispatcher:
                              event['func'].__name__,
                              inspect.getabsfile(event['func']))
                 self.events[event['name']].append(event['func'])
+
+    async def _store_incoming(self, event_type, event, db):
+        """
+        Store incoming event in db
+
+        :param msg: message
+        :param db: db facade
+        :return: None
+        """
+        ts = event.get('ts') or time.time()
+        user = event.get('user')
+
+        logger.debug('Saving incoming event %s from %s', event_type, user)
+
+        await db.execute('''INSERT INTO slack_events (ts, from_id, type, raw)
+                            VALUES (?, ?, ?, ?)''',
+                         (ts, user, event_type, json.dumps(event))
+                         )
+        await db.commit()
