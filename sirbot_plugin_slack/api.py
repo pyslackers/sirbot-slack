@@ -79,26 +79,62 @@ class APICaller:
         logger.debug('Querying SLACK HTTP API: %s', url)
         msg['token'] = token or self._token
         async with self._session.post(url, data=msg) as response:
-            if 200 <= response.status < 300:
+            return await self._validate_response(response)
+
+    async def _do_json(self, url, *, msg=None, token=None):
+        """
+        Perform a POST request with a json payload,
+        validating the response code.
+        This will throw a SlackAPIError, or decendent, on non-200
+        status codes
+
+        :param url: url for the request
+        :param msg: payload to send
+        :param token: optionally override the set token.
+        :type msg: dict
+        :return: Slack API Response
+        :rtype: dict
+        """
+        msg = msg or {}
+        logger.debug('Querying SLACK HTTP API: %s', url)
+        msg['token'] = token or self._token
+        async with self._session.post(
+                url=url,
+                data=json.dumps(msg),
+                headers={'content-type': 'application/json; charset=utf-8'}
+        ) as response:
+            return await self._validate_response(response)
+
+    async def _validate_response(self, response):
+        if 200 <= response.status < 300:
+
+            if response.headers['Content-Type'].startswith('application/json'):
                 rep = await response.json()
-                if rep['ok'] is True:
-                    logger.debug('Slack HTTP API response: OK')
-                    # logger.debug('Web API response: %s', rep)
-                    return rep
+            else:
+                rep = await response.text()
+                if rep == 'ok':
+                    rep = {'ok': True}
                 else:
-                    logger.warning('Slack HTTP API response: %s, %s', rep, msg)
-                    raise SlackAPIError(rep)
-            elif 300 <= response.status < 400:
-                e = 'Redirection, status code: {}'.format(response.status)
-                logger.error(e)
-                raise SlackRedirectionError(e)
-            elif 400 <= response.status < 500:
-                e = 'Client error, status code: {}'.format(response.status)
-                logger.error(e)
-                raise SlackConnectionError(e)
-            elif 500 <= response.status < 600:
-                e = 'Server error, status code: {}'.format(response.status)
-                raise SlackServerError(e)
+                    rep = {'ok': False, 'response': rep}
+
+            if rep['ok'] is True:
+                logger.debug('Slack HTTP API response: OK')
+                return rep
+            else:
+                logger.warning('Slack HTTP API response: %s', rep)
+                raise SlackAPIError(rep)
+        elif 300 <= response.status < 400:
+            e = 'Redirection, status code: {}'.format(response.status)
+            logger.error(e)
+            raise SlackRedirectionError(e)
+        elif 400 <= response.status < 500:
+            e = 'Client error, status code: {}'.format(response.status)
+            logger.error(e)
+            raise SlackConnectionError(e)
+        elif 500 <= response.status < 600:
+            logger.debug(await response.text())
+            e = 'Server error, status code: {}'.format(response.status)
+            raise SlackServerError(e)
 
 
 class HTTPClient(APICaller):
@@ -128,11 +164,24 @@ class HTTPClient(APICaller):
 
         :param message: Message to send
         :type message: Message
-        :return: Timestamp of the message
+        :return: Raw message content
         """
         logger.debug('Message Sent: %s', message)
-        message = message.serialize()
-        rep = await self._do_post(APIPath.MSG_POST, msg=message)
+        data = message.serialize(type_='send')
+        rep = await self._do_post(APIPath.MSG_POST, msg=data)
+        return rep
+
+    async def response(self, message):
+        """
+        Send a message in response to a slash command / an action
+
+        :param message: Message to send
+        :type message: Message
+        :return: Slack API response ('ok')
+        """
+        logger.debug('Message Sent: %s', message)
+        data = message.serialize(type_='response')
+        rep = await self._do_json(message.response_url, msg=data)
         return rep
 
     async def update(self, message):

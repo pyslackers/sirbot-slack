@@ -200,11 +200,11 @@ async def team_join(event, slack, facades):
 def register_slack_events():
     events = [
         {
-            'name': 'user_typing',
+            'event': 'user_typing',
             'func': user_typing
         },
         {
-            'name': 'team_join',
+            'event': 'team_join',
             'func': team_join
         }
     ]

@@ -36,11 +36,20 @@ class SlackFacade:
                 await self.users.ensure_dm(message.to)
 
             if message.content.username:
+                # Necessary to store the correct event in db
+                # Without custom username the message is sent as a regular
+                # user
                 message.subtype = 'bot_message'
 
             message.frm = self.bot
-            message.raw = await self._http_client.send(message=message)
-            await self._save_outgoing_message(message)
+
+            if message.response_url:
+                # Message with a response url are response to actions or slash
+                # commands
+                await self._http_client.response(message=message)
+            else:
+                message.raw = await self._http_client.send(message=message)
+                await self._save_outgoing_message(message)
 
     async def update(self, *messages):
         """
@@ -52,9 +61,6 @@ class SlackFacade:
 
             if isinstance(message.to, User):
                 await self.users.ensure_dm(message.to)
-
-            if message.content.username:
-                message.subtype = 'bot_message'
 
             message.frm = self.bot
             message.subtype = 'message_changed'
@@ -107,7 +113,7 @@ class SlackFacade:
         for message, reaction in messages:
             await self._http_client.delete_reaction(message, reaction)
 
-    async def get_reactions(self, *messages):
+    async def get_reactions(self, message):
         """
         Query the reactions of messages
 
@@ -115,16 +121,14 @@ class SlackFacade:
         :return: dictionary of reactions by message
         :rtype: dict
         """
-        reactions = dict()
-        for message in messages:
-            msg_reactions = await self._http_client.get_reaction(message)
-            for msg_reaction in msg_reactions:
-                users = list()
-                for user_id in msg_reaction.get('users'):
-                    users.append(self.users.get(id_=user_id))
-                msg_reaction['users'] = users
-            reactions[message] = msg_reactions
-            message.reactions = msg_reactions
+        reactions = await self._http_client.get_reaction(message)
+        for reaction in reactions:
+            reaction['users'] = [
+                self.users.get(id_=user_id)
+                for user_id in reaction.get('users', list())
+            ]
+
+        message.reactions = reactions
         return reactions
 
     async def conversation(self, msg, limit=0):
@@ -154,10 +158,11 @@ class SlackFacade:
         :param db: db facade
         :return: None
         """
+        message.timestamp = message.raw.get('ts')
+
         logger.debug('Saving outgoing msg to %s at %s',
                      message.to.id, message.timestamp)
 
-        message.timestamp = message.raw.get('ts')
         if not message.conversation:
             message.conversation = message.timestamp
 
