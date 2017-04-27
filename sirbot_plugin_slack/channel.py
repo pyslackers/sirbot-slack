@@ -249,31 +249,31 @@ async def channel_unarchive(event, slack, facades):
 def register_slack_events():
     events = [
         {
-            'name': 'channel_archive',
+            'event': 'channel_archive',
             'func': channel_archive
         },
         {
-            'name': 'channel_created',
+            'event': 'channel_created',
             'func': channel_created
         },
         {
-            'name': 'channel_deleted',
+            'event': 'channel_deleted',
             'func': channel_deleted
         },
         {
-            'name': 'channel_joined',
+            'event': 'channel_joined',
             'func': channel_joined
         },
         {
-            'name': 'channel_left',
+            'event': 'channel_left',
             'func': channel_left,
         },
         {
-            'name': 'channel_rename',
+            'event': 'channel_rename',
             'func': channel_rename,
         },
         {
-            'name': 'channel_unarchive',
+            'event': 'channel_unarchive',
             'func': channel_unarchive,
 
         }

@@ -146,7 +146,7 @@ async def parrot_next(message, slack, facades, *_):
 
 @hookimpl
 def register_slack_messages():
-    commands = [
+    messages = [
         {
             'match': 'test',
             'func': test
@@ -178,7 +178,7 @@ def register_slack_messages():
         }
     ]
 
-    return commands
+    return messages
 
 
 @hookimpl

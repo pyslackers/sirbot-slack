@@ -21,3 +21,19 @@ def register_slack_messages():
     Messages hook
     """
     pass
+
+
+@hookspec
+def register_slack_commands():
+    """
+    Messages hook
+    """
+    pass
+
+
+@hookspec
+def register_slack_actions():
+    """
+    Messages hook
+    """
+    pass

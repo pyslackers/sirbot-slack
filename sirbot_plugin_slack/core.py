@@ -1,19 +1,20 @@
+import asyncio
+import importlib
 import logging
 import os
 import pluggy
-import importlib
-import asyncio
 
+from aiohttp.web import Response
 from sirbot import Plugin
 
-from .__meta__ import DATA as METADATA
 from . import hookspecs
+from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
-from .dispatcher import SlackMainDispatcher
-from .user import SlackUserManager
 from .channel import SlackChannelManager
-from .facade import SlackFacade
+from .dispatcher import SlackMainDispatcher
 from .errors import SlackClientError
+from .facade import SlackFacade
+from .user import SlackUserManager
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -28,16 +29,18 @@ class SirBotSlack(Plugin):
         super().__init__(loop)
         logger.debug('Initializing slack plugin')
         self._loop = loop
+        self._router = None
         self._config = None
         self._facades = None
         self._session = None
-
-        self._token = None
-        self._dispatcher = None
+        self._bot_token = None
+        self._app_token = None
+        self._verification_token = None
         self._rtm_client = None
         self._http_client = None
         self._users = None
         self._channels = None
+        self._dispatcher = None
 
     @property
     def started(self):
@@ -48,22 +51,56 @@ class SirBotSlack(Plugin):
     async def configure(self, config, router, session, facades):
         logger.debug('Configuring slack plugin')
         self._config = config
+        self._router = router
         self._session = session
         self._facades = facades
 
-        self._token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
-        if not self._token:
-            raise EnvironmentError(
-                'SIRBOT_SLACK_TOKEN environment variable is not set')
+        self._router.add_route('POST', '/commands', self._incoming_command)
+        self._router.add_route('POST', '/buttons', self._incoming_button)
 
-        self._http_client = HTTPClient(token=self._token,
-                                       loop=self._loop,
-                                       session=self._session)
-        self._users = SlackUserManager(client=self._http_client,
-                                       facades=self._facades)
-        self._channels = SlackChannelManager(client=self._http_client,
-                                             facades=self._facades)
+        self._bot_token = os.environ.get('SIRBOT_SLACK_BOT_TOKEN', '')
+        self._app_token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
+        self._verification_token = os.environ.get(
+            'SIRBOT_SLACK_VERIFICATION_TOKEN'
+        )
+
+        if 'database' not in self._facades:
+            raise EnvironmentError('Slack plugin required a database plugin')
+
+        if not self._verification_token:
+            raise EnvironmentError(
+                'SIRBOT_SLACK_VERIFICATION_TOKEN must be set'
+            )
+
+        if not self._bot_token:
+            logger.warning('SIRBOT_SLACK_BOT_TOKEN not set')
+        if not self._app_token:
+            logger.warning('SIRBOT_SLACK_TOKEN not set')
+
         pm = self._initialize_plugins()
+
+        self._http_client = HTTPClient(
+            token=self._bot_token,
+            loop=self._loop,
+            session=self._session
+        )
+
+        self._rtm_client = RTMClient(
+            token=self._bot_token,
+            loop=self._loop,
+            callback=self._incoming_rtm,
+            session=self._session
+        )
+
+        self._users = SlackUserManager(
+            client=self._http_client,
+            facades=self._facades
+        )
+
+        self._channels = SlackChannelManager(
+            client=self._http_client,
+            facades=self._facades
+        )
 
         self._dispatcher = SlackMainDispatcher(
             http_client=self._http_client,
@@ -72,11 +109,9 @@ class SirBotSlack(Plugin):
             pm=pm,
             facades=facades,
             loop=self._loop,
-            config=self._config
+            config=self._config,
+            verification=self._verification_token
         )
-        self._rtm_client = RTMClient(token=self._token, loop=self._loop,
-                                     callback=self.incoming,
-                                     session=self._session)
 
     def facade(self):
         """
@@ -85,18 +120,20 @@ class SirBotSlack(Plugin):
         This is called by the core when a for each incoming message and when
         another plugin request a slack facade
         """
-        return SlackFacade(http_client=self._http_client,
-                           users=self._users,
-                           channels=self._channels,
-                           bot=self._dispatcher.bot,
-                           facades=self._facades)
+        return SlackFacade(
+            http_client=self._http_client,
+            users=self._users,
+            channels=self._channels,
+            bot=self._dispatcher.bot,
+            facades=self._facades
+        )
 
     async def start(self):
         logger.debug('Starting slack plugin')
         await self._create_db_table()
         await self._rtm_client.connect()
 
-    async def _reconnect(self):
+    async def _rtm_reconnect(self):
         logger.warning('Trying to reconnect to slack')
         try:
             await self._rtm_client.connect()
@@ -104,28 +141,50 @@ class SirBotSlack(Plugin):
             await asyncio.sleep(1, loop=self._loop)
             await self._reconnect()
 
-    async def incoming(self, msg):
+    async def _incoming_rtm(self, msg):
         msg_type = msg.get('type', None)
 
-        if msg_type in ('team_migration_started', 'goodbye'):
-            logger.debug('Bot needs to reconnect')
-            await self._reconnect()
+        if self.started or msg_type == 'connected':
+            if msg_type in ('team_migration_started', 'goodbye'):
+                logger.debug('Bot needs to reconnect')
+                await self._rtm_reconnect()
+            else:
+                await self._dispatcher.incoming_rtm(msg, msg_type)
+
+    async def _incoming_command(self, request):
+        if self.started:
+            return await self._dispatcher.incoming_command(request)
         else:
-            await self._dispatcher.incoming(msg, msg_type)
+            return Response(
+                text='''Not fully started. Please try latter !'''
+            )
+
+    async def _incoming_button(self, request):
+
+        if self.started:
+            return await self._dispatcher.incoming_button(request)
+        else:
+            return Response(
+                text='''Not fully started. Please try latter !'''
+            )
 
     def _initialize_plugins(self):
         """
         Import and register the plugins
 
-        Most likely composed of functions reacting to events and messages
+        Most likely composed of functions reacting to messages, events, slash
+        commands and actions
         """
         logger.debug('Initializing plugins of slack plugin')
         pm = pluggy.PluginManager('sirbot.slack')
         pm.add_hookspecs(hookspecs)
 
         for plugin in MANDATORY_PLUGIN + self._config.get('plugins', []):
-            p = importlib.import_module(plugin)
-            pm.register(p)
+            try:
+                p = importlib.import_module(plugin)
+                pm.register(p)
+            except Exception as e:
+                logger.exception(e)
 
         return pm
 
@@ -174,6 +233,26 @@ class SirBotSlack(Plugin):
         type TEXT,
         raw TEXT,
         PRIMARY KEY (ts, type)
+        )''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_commands (
+        ts REAL,
+        channel TEXT,
+        user TEXT,
+        command TEXT,
+        text TEXT,
+        raw TEXT,
+        PRIMARY KEY (ts, user, channel, command)
+        )''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS slack_actions (
+        ts REAL,
+        channel TEXT,
+        user TEXT,
+        callback_id TEXT,
+        action TEXT,
+        raw TEXT,
+        PRIMARY KEY (ts, user, channel)
         )''')
 
         await db.set_plugin_metadata(self)
