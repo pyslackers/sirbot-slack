@@ -34,6 +34,7 @@ class APIPath:
     CHANNEL_INFO = SLACK_API_ROOT.format('channels.info')
 
     RTM_START = SLACK_API_ROOT.format('rtm.start')
+    RTM_CONNECT = SLACK_API_ROOT.format('rtm.connect')
 
     USER_INFO = SLACK_API_ROOT.format('users.info')
 
@@ -382,13 +383,11 @@ class RTMClient(APICaller):
         """
         Get the RTM url
         """
-        self._login_data = await self._do_post(APIPath.RTM_START)
+        self._login_data = await self._do_post(APIPath.RTM_CONNECT)
         if self._login_data.get('ok') is False:
             raise SlackConnectionError(
                 'Error with slack {}'.format(self._login_data))
 
-        # TODO: We will want to make sure to add in re-connection
-        #       functionality if there is an error.
         return self._login_data
 
     async def connect(self):

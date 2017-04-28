@@ -133,11 +133,7 @@ class SlackMainDispatcher:
         Parse data from the login event to slack
         and initialize the message and event dispatcher
         """
-        logger.debug('Loading teams info')
-        await self._parse_channels(login_data['channels'])
-        await self._parse_channels(login_data['groups'])
-        await self._parse_users(login_data['users'])
-
+        logger.debug('Loading team info')
         self.bot_id = login_data['self']['id']
         self.bot = await self._users.get(self.bot_id)
 
