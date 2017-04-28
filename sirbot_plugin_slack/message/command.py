@@ -7,7 +7,7 @@ logger = logging.getLogger('sirbot.slack')
 
 
 class SlackCommand:
-    def __init__(self, command, channel, user, response_url, timestamp,
+    def __init__(self, command, frm, to, response_url, timestamp,
                  text='', raw=None, settings=None):
 
         if not raw:
@@ -17,8 +17,8 @@ class SlackCommand:
             settings = dict()
 
         self.command = command
-        self.channel = channel
-        self.user = user
+        self.frm = frm
+        self.to = to
         self.response_url = response_url
         self.timestamp = timestamp
         self.text = text
@@ -27,16 +27,20 @@ class SlackCommand:
 
     @classmethod
     async def from_raw(cls, data, slack, timestamp=None, settings=None):
-        channel = await slack.channels.get(data['channel_id'])
-        user = await slack.users.get(data['user_id'])
+
+        frm = await slack.users.get(data['user_id'])
+        if data['channel_id'].startswith(('C', 'G')):
+            to = await slack.channels.get(data['channel_id'])
+        else:
+            to = frm
 
         if not timestamp:
             timestamp = time.time()
 
         return SlackCommand(
             command=data['command'],
-            channel=channel,
-            user=user,
+            to=to,
+            frm=frm,
             response_url=data['response_url'],
             text=data['text'],
             timestamp=timestamp,
@@ -52,7 +56,7 @@ class SlackCommand:
             response_type = 'ephemeral'
 
         return SlackMessage(
-            to=self.channel,
+            to=self.to,
             response_url=self.response_url,
             response_type=response_type
         )
