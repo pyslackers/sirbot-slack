@@ -176,21 +176,18 @@ class SlackMessageDispatcher:
             self.ensure_handler(coroutine=f, msg=msg)
 
     def ensure_handler(self, coroutine, msg):
-        future_callback = functools.partial(self.handler_done_callback,
-                                            msg=msg)
-        future = asyncio.ensure_future(coroutine, loop=self._loop)
-        future.add_done_callback(future_callback)
+        callback = functools.partial(self.handler_done_callback,
+                                     msg=msg)
+        task = asyncio.ensure_future(coroutine, loop=self._loop)
+        task.add_done_callback(callback)
 
     def handler_done_callback(self, f, msg):
-        try:
-            error = f.exception()
-            result = f.result()
-        except asyncio.CancelledError:
-            return
 
-        if error is not None:
-            logger.exception("Task exited with error",
-                             exc_info=error)
+        try:
+            result = f.result()
+        except Exception as e:
+            logger.exception(e)
+            raise
 
         if result and 'func' in result:
             to = result.get('to', msg.to)

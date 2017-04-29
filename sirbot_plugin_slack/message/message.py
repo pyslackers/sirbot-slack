@@ -1,8 +1,8 @@
 import json
 import logging
 
-from sirbot_plugin_slack.errors import SlackMessageError
-from sirbot_plugin_slack.user import User
+from ..errors import SlackMessageError
+from ..manager.user import User
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -179,11 +179,9 @@ class SlackContent:
             else:
                 data['attachments'] = attachments
 
+        data['as_user'] = False
         if self.username:
-            data['as_user'] = False
             data['username'] = self.username
-        else:
-            data['as_user'] = True
 
         if self.icon:
             if self.icon.startswith(':'):
@@ -192,5 +190,4 @@ class SlackContent:
                 data['icon_url'] = self.icon
 
         data['mrkdwn'] = self.markdown
-
         return data

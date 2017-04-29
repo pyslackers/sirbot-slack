@@ -2,8 +2,8 @@ import json
 import logging
 import sqlite3
 
+from .manager.user import User
 from .message import SlackMessage
-from .user import User
 
 logger = logging.getLogger('sirbot.slack')
 

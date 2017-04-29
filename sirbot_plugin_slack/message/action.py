@@ -1,6 +1,7 @@
 import logging
 
-from sirbot_plugin_slack.message import SlackMessage
+from .message import SlackMessage
+from ..manager.channel import Channel
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -38,6 +39,10 @@ class SlackAction:
         frm = await slack.users.get(data['user']['id'])
         if data['channel']['id'].startswith(('C', 'G')):
             to = await slack.channels.get(data['channel']['id'])
+
+            if not to:
+                to = Channel(id_=data['channel']['id'])
+
         else:
             to = frm
 

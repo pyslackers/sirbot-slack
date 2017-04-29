@@ -1,13 +1,11 @@
 import asyncio
 import json
 import logging
-import time
+import aiohttp
+
 from typing import Any, AnyStr, Dict, Optional
 
-import aiohttp
 from sirbot.utils import ensure_future
-
-from .channel import Channel
 from .errors import (
     SlackConnectionError,
     SlackServerError,
@@ -33,6 +31,9 @@ class APIPath:
     CHANNEL_GET = SLACK_API_ROOT.format('channels.list')
     CHANNEL_INFO = SLACK_API_ROOT.format('channels.info')
 
+    GROUP_GET = SLACK_API_ROOT.format('groups.list')
+    GROUP_INFO = SLACK_API_ROOT.format('groups.info')
+
     RTM_START = SLACK_API_ROOT.format('rtm.start')
     RTM_CONNECT = SLACK_API_ROOT.format('rtm.connect')
 
@@ -48,12 +49,15 @@ class APICaller:
     :param token: Slack API Token
     :param loop: Asyncio event loop to run in.
     """
-    __slots__ = ('_token', '_loop', '_session')
+    __slots__ = ('_bot_token', '_app_token', '_token', '_loop', '_session')
 
-    def __init__(self, token: str, *,
+    def __init__(self, bot_token, app_token=None,
                  loop: Optional[asyncio.BaseEventLoop] = None,
                  session: aiohttp.ClientSession = None):
-        self._token = token
+
+        self._bot_token = bot_token
+        self._app_token = app_token
+        self._token = app_token or bot_token
         self._loop = loop or asyncio.get_event_loop()
         self._session = session or aiohttp.ClientSession(loop=self._loop)
 
@@ -279,29 +283,28 @@ class HTTPClient(APICaller):
         logger.debug('Getting channels')
 
         rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
-        now = time.time()
-        channels = [
-            Channel(
-                id_=data['id'],
-                raw=data,
-                last_update=now
-            )
-            for data in rep.get('channels', [])
-        ]
+        channels = [data for data in rep.get('channels', [])]
 
         return channels
 
     async def find_channel(self, name):
         logger.debug('Finding channel: %s', name)
-        rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
+        msg = {'exclude_members': True}
 
-        for data in rep.get('channels', []):
-            if name == data.get('name'):
-                return Channel(
-                    id_=data['id'],
-                    raw=data,
-                    last_update=time.time()
-                )
+        f = [
+            self._do_post(APIPath.CHANNEL_GET, msg=msg),
+            self._do_post(APIPath.GROUP_GET)
+        ]
+
+        tasks, _ = await asyncio.wait(f, return_when=asyncio.ALL_COMPLETED)
+
+        for task in tasks:
+            data = task.result()
+            for channel in data.get('channels', data.get('groups', [])):
+                if name == channel.get('name'):
+                    if channel['id'].startswith('C'):
+                        channel = await self.get_channel_info(channel['id'])
+                    return channel
 
     async def get_channel_info(self, channel_id: str):
         """
@@ -317,6 +320,21 @@ class HTTPClient(APICaller):
 
         rep = await self._do_post(APIPath.CHANNEL_INFO, msg=msg)
         return rep['channel']
+
+    async def get_group_info(self, group_id: str):
+        """
+        Query the information about a channel
+
+        :param group_id: id of the private channel to query
+        :return: information
+        :rtype: dict
+        """
+        msg = {
+            'channel': group_id
+        }
+
+        rep = await self._do_post(APIPath.GROUP_INFO, msg=msg)
+        return rep['group']
 
     async def get_user_info(self, user_id: str):
         """
@@ -358,11 +376,11 @@ class RTMClient(APICaller):
     :param loop: Event loop to work in, optional.
     """
 
-    def __init__(self, token, callback,
+    def __init__(self, bot_token, callback,
                  *, loop: Optional[asyncio.BaseEventLoop] = None,
                  session: aiohttp.ClientSession = None):
 
-        super().__init__(token, loop=loop, session=session)
+        super().__init__(bot_token, loop=loop, session=session)
         self._ws = None
         self._login_data = None
         self._closed = asyncio.Event(loop=self._loop)

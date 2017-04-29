@@ -1,18 +1,17 @@
-import logging
 import asyncio
-import time
 import json
+import logging
+import time
 
 from aiohttp.web import Response
 
-from ..__meta__ import DATA as METADATA
-from ..user import User
-from ..channel import Channel
+from .action import SlackActionDispatcher
+from .command import SlackCommandDispatcher
 from .event import SlackEventDispatcher
 from .message import SlackMessageDispatcher
-from .command import SlackCommandDispatcher
-from .action import SlackActionDispatcher
-
+from ..__meta__ import DATA as METADATA
+from ..manager.channel import Channel
+from ..manager.user import User
 
 logger = logging.getLogger('sirbot.slack')
 
