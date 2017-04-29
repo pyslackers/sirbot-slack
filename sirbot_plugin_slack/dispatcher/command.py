@@ -64,13 +64,13 @@ class SlackCommandDispatcher:
 
     async def _save_incoming(self, command, db):
         logger.debug('Saving incoming command %s from %s',
-                     command.command, command.user.id)
+                     command.command, command.frm.id)
 
         await db.execute('''INSERT INTO slack_commands
-                            (ts, channel, user, command, text, raw) VALUES
+                            (ts, to_id, from_id, command, text, raw) VALUES
                             (? ,?, ?, ?, ?, ?)''',
-                         (command.timestamp, command.channel.id,
-                          command.user.id, command.command, command.text,
+                         (command.timestamp, command.to.id,
+                          command.frm.id, command.command, command.text,
                           json.dumps(command.raw))
                          )
 

@@ -6,7 +6,7 @@ logger = logging.getLogger('sirbot.slack')
 
 
 class SlackAction:
-    def __init__(self, callback_id, channel, user, response_url, action, ts,
+    def __init__(self, callback_id, to, frm, response_url, action, ts,
                  message_ts, raw=None, settings=None):
 
         if not raw:
@@ -16,8 +16,8 @@ class SlackAction:
             settings = dict()
 
         self.callback_id = callback_id
-        self.channel = channel
-        self.user = user
+        self.frm = frm
+        self.to = to
         self.ts = ts
         self.response_url = response_url
         self.action = action
@@ -27,20 +27,24 @@ class SlackAction:
 
     def response(self):
         return SlackMessage(
-            to=self.channel,
+            to=self.to,
             response_url=self.response_url,
             timestamp=self.message_ts
         )
 
     @classmethod
     async def from_raw(cls, data, slack, settings=None):
-        channel = await slack.channels.get(data['channel']['id'])
-        user = await slack.users.get(data['user']['id'])
+
+        frm = await slack.users.get(data['user']['id'])
+        if data['channel']['id'].startswith(('C', 'G')):
+            to = await slack.channels.get(data['channel']['id'])
+        else:
+            to = frm
 
         return SlackAction(
             callback_id=data['callback_id'],
-            channel=channel,
-            user=user,
+            to=to,
+            frm=frm,
             response_url=data['response_url'],
             action=data['actions'][0],
             ts=data['action_ts'],

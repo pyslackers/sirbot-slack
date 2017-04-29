@@ -64,12 +64,12 @@ class SlackActionDispatcher:
 
     async def _save_incoming(self, action, db):
         logger.debug('Saving incoming action %s from %s', action.callback_id,
-                     action.user.id)
+                     action.frm.id)
 
         await db.execute('''INSERT INTO slack_actions
-                            (ts, channel, user, callback_id, action, raw)
+                            (ts, to_id, from_id, callback_id, action, raw)
                             VALUES (?, ?, ?, ?, ?, ?)''',
-                         (action.ts, action.channel.id, action.user.id,
+                         (action.ts, action.to.id, action.frm.id,
                           action.callback_id, json.dumps(action.action),
                           json.dumps(action.raw))
                          )
