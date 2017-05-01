@@ -144,7 +144,7 @@ class SlackChannelManager:
             data = await self._update(data)
             channel = Channel(
                 id_=data['id'],
-                raw=json.loads(data['raw']),
+                raw=data,
                 last_update=time.time()
             )
             await self.add(channel, db=db)

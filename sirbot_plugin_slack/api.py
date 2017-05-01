@@ -173,7 +173,12 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Sent: %s', message)
         data = message.serialize(type_='send')
-        rep = await self._do_post(APIPath.MSG_POST, msg=data)
+        rep = await self._do_post(
+            APIPath.MSG_POST,
+            msg=data,
+            token=self._bot_token
+        )
+
         return rep
 
     async def response(self, message):
@@ -203,7 +208,12 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Update: %s', message)
         message = message.serialize()
-        rep = await self._do_post(APIPath.MSG_UPDATE, msg=message)
+        rep = await self._do_post(
+            APIPath.MSG_UPDATE,
+            msg=message,
+            token=self._bot_token
+        )
+
         return rep
 
     async def add_reaction(self, message, reaction: str = 'thumbsup'):
@@ -364,7 +374,12 @@ class HTTPClient(APICaller):
             'user': user_id
         }
 
-        rep = await self._do_post(APIPath.IM_OPEN, msg=msg)
+        rep = await self._do_post(
+            APIPath.IM_OPEN,
+            msg=msg,
+            token=self._bot_token
+        )
+
         return rep['channel']['id']
 
 
