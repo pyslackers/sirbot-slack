@@ -3,15 +3,17 @@ import importlib
 import logging
 import os
 import pluggy
+import yaml
 
 from aiohttp.web import Response
 from sirbot import Plugin
+from sirbot.utils import merge_dict
 
 from . import hookspecs
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
 from .dispatcher import SlackMainDispatcher
-from .errors import SlackClientError
+from .errors import SlackClientError, SlackSetupError
 from .facade import SlackFacade
 from .manager import SlackChannelManager, SlackUserManager
 
@@ -22,8 +24,9 @@ MANDATORY_PLUGIN = ['sirbot_plugin_slack.manager.user',
 
 
 class SirBotSlack(Plugin):
-    __name__ = METADATA['name']
+    __name__ = 'slack'
     __version__ = METADATA['version']
+    __facade__ = 'slack'
 
     def __init__(self, loop):
         super().__init__(loop)
@@ -50,7 +53,16 @@ class SirBotSlack(Plugin):
 
     async def configure(self, config, router, session, facades):
         logger.debug('Configuring slack plugin')
-        self._config = config
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            '..', 'config.yml'
+        )
+
+        with open(path) as file:
+            defaultconfig = yaml.load(file)
+
+        self._config = merge_dict(config, defaultconfig[self.__name__])
+
         self._router = router
         self._session = session
         self._facades = facades
@@ -65,17 +77,18 @@ class SirBotSlack(Plugin):
         )
 
         if 'database' not in self._facades:
-            raise EnvironmentError('Slack plugin required a database plugin')
+            raise SlackSetupError('A database facades is required')
 
-        if not self._verification_token:
-            raise EnvironmentError(
-                'SIRBOT_SLACK_VERIFICATION_TOKEN must be set'
+        if not self._bot_token and not self._app_token:
+            raise SlackSetupError(
+                'One of SIRBOT_SLACK_BOT_TOKEN or SIRBOT_SLACK_TOKEN'
+                ' must be set'
             )
 
-        if not self._bot_token:
-            logger.warning('SIRBOT_SLACK_BOT_TOKEN not set')
-        if not self._app_token:
-            logger.warning('SIRBOT_SLACK_TOKEN not set')
+        if self._app_token and not self._verification_token:
+            raise SlackSetupError(
+                'SIRBOT_SLACK_VERIFICATION_TOKEN must be set'
+            )
 
         pm = self._initialize_plugins()
 
@@ -86,21 +99,28 @@ class SirBotSlack(Plugin):
             session=self._session
         )
 
-        self._rtm_client = RTMClient(
-            bot_token=self._bot_token,
-            loop=self._loop,
-            callback=self._incoming_rtm,
-            session=self._session
-        )
+        if self._bot_token:
+            self._rtm_client = RTMClient(
+                bot_token=self._bot_token,
+                loop=self._loop,
+                callback=self._incoming_rtm,
+                session=self._session
+            )
+        else:
+            logger.info(
+                'No bot token. Sir-bot-a-lot will not connect to the RTM API'
+            )
 
         self._users = SlackUserManager(
             client=self._http_client,
-            facades=self._facades
+            facades=self._facades,
+            refresh=self._config['refresh']['user']
         )
 
         self._channels = SlackChannelManager(
             client=self._http_client,
-            facades=self._facades
+            facades=self._facades,
+            refresh=self._config['refresh']['channel']
         )
 
         self._dispatcher = SlackMainDispatcher(
@@ -132,7 +152,10 @@ class SirBotSlack(Plugin):
     async def start(self):
         logger.debug('Starting slack plugin')
         await self._create_db_table()
-        await self._rtm_client.connect()
+        if self._rtm_client:
+            await self._rtm_client.connect()
+        else:
+            self._dispatcher.started = True
 
     async def _rtm_reconnect(self):
         logger.warning('Trying to reconnect to slack')

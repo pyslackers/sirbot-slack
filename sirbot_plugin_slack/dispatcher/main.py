@@ -9,7 +9,6 @@ from .action import SlackActionDispatcher
 from .command import SlackCommandDispatcher
 from .event import SlackEventDispatcher
 from .message import SlackMessageDispatcher
-from ..__meta__ import DATA as METADATA
 from ..manager.channel import Channel
 from ..manager.user import User
 
@@ -51,7 +50,7 @@ class SlackMainDispatcher:
         This method is called for every incoming messages
         """
         facades = self._facades.new()
-        slack = facades.get(METADATA['name'])
+        slack = facades.get('slack')
         logger.debug('Incoming event: %s', msg_type)
 
         # Wait for the plugin to be fully started before dispatching incoming
@@ -85,7 +84,7 @@ class SlackMainDispatcher:
             return Response(text='Invalid')
 
         facades = self._facades.new()
-        slack = facades.get(METADATA['name'])
+        slack = facades.get('slack')
         logger.debug('Incoming slash command: %s', data['command'])
         try:
             return await self._command_dispatcher.incoming(
@@ -116,7 +115,7 @@ class SlackMainDispatcher:
             return Response(text='Invalid', status=400)
 
         facades = self._facades.new()
-        slack = facades.get(METADATA['name'])
+        slack = facades.get('slack')
         try:
             return await self._action_dispatcher.incoming(
                 json.loads(data['payload']),
@@ -141,14 +140,14 @@ class SlackMainDispatcher:
             channels=self._channels,
             bot=self.bot,
             pm=self._pm,
-            save=self._config.get('save', {}).get('message', False),
+            save=self._config['save']['messages'],
             loop=self._loop,
         )
 
         self._event_dispatcher = SlackEventDispatcher(
             pm=self._pm,
             loop=self._loop,
-            save=self._config.get('save', {}).get('events', [])
+            save=self._config['save']['events']
         )
 
         self._command_dispatcher = SlackCommandDispatcher(
@@ -156,7 +155,7 @@ class SlackMainDispatcher:
             channels=self._channels,
             pm=self._pm,
             loop=self._loop,
-            save=self._config.get('save', {}).get('commands', [])
+            save=self._config['save']['commands']
         )
 
         self._action_dispatcher = SlackActionDispatcher(
@@ -164,7 +163,7 @@ class SlackMainDispatcher:
             channels=self._channels,
             pm=self._pm,
             loop=self._loop,
-            save=self._config.get('save', {}).get('commands', [])
+            save=self._config['save']['actions']
         )
 
         self.started = True

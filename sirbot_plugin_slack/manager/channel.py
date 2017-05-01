@@ -103,9 +103,10 @@ class SlackChannelManager:
     Manager for the slack channels
     """
 
-    def __init__(self, client, facades):
+    def __init__(self, client, facades, refresh):
         self._client = client
         self._facades = facades
+        self._refresh = refresh
         self._channels = dict()
 
     async def add(self, channel, *, db=None):
@@ -140,7 +141,9 @@ class SlackChannelManager:
         elif id_:
             data = await self._get_by_id(id_, db)
 
-        if data and (update or data['last_update'] < (time.time() - 3600)):
+        if data and (
+                update or data['last_update'] < (time.time() - self._refresh)
+        ):
             data = await self._update(data)
             channel = Channel(
                 id_=data['id'],
