@@ -139,7 +139,7 @@ class SirBotSlack(Plugin):
             await self._rtm_client.connect()
         except SlackClientError:
             await asyncio.sleep(1, loop=self._loop)
-            await self._reconnect()
+            await self._rtm_reconnect()
 
     async def _incoming_rtm(self, msg):
         msg_type = msg.get('type', None)
