@@ -10,15 +10,15 @@ from sirbot import Plugin
 from . import hookspecs
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
-from .channel import SlackChannelManager
 from .dispatcher import SlackMainDispatcher
 from .errors import SlackClientError
 from .facade import SlackFacade
-from .user import SlackUserManager
+from .manager import SlackChannelManager, SlackUserManager
 
 logger = logging.getLogger('sirbot.slack')
 
-MANDATORY_PLUGIN = ['sirbot_plugin_slack.user', 'sirbot_plugin_slack.channel']
+MANDATORY_PLUGIN = ['sirbot_plugin_slack.manager.user',
+                    'sirbot_plugin_slack.manager.channel']
 
 
 class SirBotSlack(Plugin):
@@ -80,13 +80,14 @@ class SirBotSlack(Plugin):
         pm = self._initialize_plugins()
 
         self._http_client = HTTPClient(
-            token=self._bot_token,
+            bot_token=self._bot_token,
+            app_token=self._app_token,
             loop=self._loop,
             session=self._session
         )
 
         self._rtm_client = RTMClient(
-            token=self._bot_token,
+            bot_token=self._bot_token,
             loop=self._loop,
             callback=self._incoming_rtm,
             session=self._session

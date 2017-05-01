@@ -2,7 +2,8 @@ import logging
 import time
 import json
 
-from .hookimpl import hookimpl
+from ..hookimpl import hookimpl
+from ..errors import SlackAPIError, SlackChannelNotFound
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -30,7 +31,7 @@ class Channel:
 
     @name.setter
     def name(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def member(self):
@@ -38,7 +39,7 @@ class Channel:
 
     @member.setter
     def member(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def members(self):
@@ -46,7 +47,7 @@ class Channel:
 
     @members.setter
     def members(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def topic(self):
@@ -54,7 +55,7 @@ class Channel:
 
     @topic.setter
     def topic(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def purpose(self):
@@ -62,7 +63,7 @@ class Channel:
 
     @purpose.setter
     def purpose(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def archived(self):
@@ -70,7 +71,7 @@ class Channel:
 
     @archived.setter
     def archived(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def raw(self):
@@ -78,7 +79,7 @@ class Channel:
 
     @raw.setter
     def raw(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def send_id(self):
@@ -94,7 +95,7 @@ class Channel:
 
     @last_update.setter
     def last_update(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class SlackChannelManager:
@@ -107,11 +108,11 @@ class SlackChannelManager:
         self._facades = facades
         self._channels = dict()
 
-    async def add(self, channel):
+    async def add(self, channel, *, db=None):
         """
         Add a channel to the channel manager
         """
-        db = self._facades.get('database')
+        db = db or self._facades.get('database')
         await db.execute(
             '''INSERT OR REPLACE INTO slack_channels (id, name, is_member,
              is_archived, raw, last_update) VALUES (?, ?, ?, ?, ?, ?)''',
@@ -135,42 +136,85 @@ class SlackChannelManager:
 
         db = self._facades.get('database')
         if name:
-            await db.execute('''SELECT id, raw, last_update FROM slack_channels
-                                WHERE name = ?''',
-                             (name,)
-                             )
-            data = await db.fetchone()
+            data = await self._get_by_name(name, db)
         elif id_:
-            await db.execute('''SELECT id, raw, last_update FROM slack_channels
-                                WHERE id = ?''',
-                             (id_,)
-                             )
-            data = await db.fetchone()
+            data = await self._get_by_id(id_, db)
 
-        if data is None or data['last_update'] < (time.time() - 3600)\
-                or update:
-            logger.debug('Channel not found in the channel manager. '
-                         'Querying the Slack API')
-            if id_:
-                data = await self._client.get_channel_info(id_)
-                channel = Channel(
-                    id_=data['id'],
-                    raw=data,
-                    last_update=time.time()
-                )
-                await self.add(channel)
-                return channel
-            else:
-                channel = await self._client.find_channel(name)
-                await self.add(channel)
-        else:
+        if data and (update or data['last_update'] < (time.time() - 3600)):
+            data = await self._update(data)
+            channel = Channel(
+                id_=data['id'],
+                raw=json.loads(data['raw']),
+                last_update=time.time()
+            )
+            await self.add(channel, db=db)
+            return channel
+        elif data:
             channel = Channel(
                 id_=data['id'],
                 raw=json.loads(data['raw']),
                 last_update=data['last_update']
             )
+            return channel
+        else:
+            logger.debug('Channel "%s" not found in the channel manager. '
+                         'Querying the Slack API', (id_ or name))
+            if id_:
+                data = await self._find_by_id(id_)
+            else:
+                data = await self._client.find_channel(name)
 
-        return channel
+            if not data:
+                raise SlackChannelNotFound(id_, name)
+
+            channel = Channel(
+                id_=data['id'],
+                raw=data,
+                last_update=time.time()
+            )
+            await self.add(channel, db=db)
+            return channel
+
+    async def _find_by_id(self, id_):
+        if id_.startswith('C'):
+            data = await self._client.get_channel_info(id_)
+        else:
+            try:
+                data = await self._client.get_group_info(id_)
+            except SlackAPIError as e:
+                if e.error == 'channel_not_found':
+                    data = None
+                    logger.debug(
+                        'Group "%s" not found in available groups', id_)
+                else:
+                    raise
+
+        return data
+
+    async def _get_by_name(self, name, db):
+        await db.execute('''SELECT id, raw, last_update FROM slack_channels
+                            WHERE name = ?''',
+                         (name,)
+                         )
+        data = await db.fetchone()
+        return data
+
+    async def _get_by_id(self, id_, db):
+        await db.execute('''SELECT id, raw, last_update FROM slack_channels
+                            WHERE id = ?''',
+                         (id_,)
+                         )
+        data = await db.fetchone()
+        return data
+
+    async def _update(self, data):
+
+        if data['id'].startswith('C'):
+            data = await self._client.get_channel_info(data['id'])
+        else:
+            data = dict()
+
+        return data
 
     async def delete(self, id_):
         """

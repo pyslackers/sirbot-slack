@@ -2,7 +2,7 @@ import json
 import logging
 import time
 
-from .hookimpl import hookimpl
+from ..hookimpl import hookimpl
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -29,7 +29,7 @@ class User:
 
     @name.setter
     def name(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def admin(self):
@@ -37,7 +37,7 @@ class User:
 
     @admin.setter
     def admin(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def bot(self):
@@ -45,7 +45,7 @@ class User:
 
     @bot.setter
     def bot(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def bot_id(self):
@@ -53,7 +53,7 @@ class User:
 
     @bot_id.setter
     def bot_id(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def raw(self):
@@ -61,7 +61,7 @@ class User:
 
     @raw.setter
     def raw(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def send_id(self):
@@ -69,7 +69,7 @@ class User:
 
     @send_id.setter
     def send_id(self, _):
-        raise ValueError('Read only property')
+        raise NotImplementedError
 
     @property
     def last_update(self):
@@ -77,7 +77,7 @@ class User:
 
     @last_update.setter
     def last_update(self, _):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class SlackUserManager:

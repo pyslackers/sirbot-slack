@@ -20,6 +20,19 @@ class SlackRedirectionError(SlackClientError):
 class SlackAPIError(SlackClientError):
     """Wrong use of slack API"""
 
+    def __init__(self, response):
+        self.ok = response.get('ok')
+        self.error = response.get('error')
+        self.response = response
+
 
 class SlackMessageError(MessageError):
     """Generic slack message error"""
+
+
+class SlackChannelNotFound(SlackClientError):
+    """Channel non existent or not available to the bot"""
+
+    def __init__(self, id_=None, name=None):
+        self.id = id_
+        self.name = name
