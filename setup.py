@@ -4,7 +4,7 @@ import codecs
 from pathlib import Path
 import sys
 
-from setuptools import setup, convert_path
+from setuptools import setup, convert_path, find_packages
 
 
 if sys.version_info < (3, 5):
@@ -67,12 +67,7 @@ setup(
         'bot',
         'slack',
     ],
-    packages=[
-        'sirbot_plugin_slack'
-    ],
-    package_dir={
-        'sirbot_plugin_slack': 'sirbot_plugin_slack',
-    },
+    packages=find_packages(),
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and
     # allow pip to create the appropriate form of executable for the
