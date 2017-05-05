@@ -68,10 +68,16 @@ setup(
         'slack',
     ],
     packages=[
-        'sirbot_plugin_slack'
+        'sirbot_plugin_slack',
+        'sirbot_plugin_slack.dispatcher',
+        'sirbot_plugin_slack.manager',
+        'sirbot_plugin_slack.message',
     ],
     package_dir={
         'sirbot_plugin_slack': 'sirbot_plugin_slack',
+        'dispatcher': 'sirbot_plugin_slack/dispatcher',
+        'manager': 'sirbot_plugin_slack/manager',
+        'message': 'sirbot_plugin_slack/message',
     },
     package_data={
         'sirbot_plugin_slack': ['config.yml']
