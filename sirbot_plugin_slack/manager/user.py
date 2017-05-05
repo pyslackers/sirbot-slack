@@ -136,6 +136,7 @@ class SlackUserManager:
                     last_update=time.time(),
                     dm_id=data['dm_id']
                 )
+                self.add(user)
             elif data:
                 user = User(
                     id_=id_,
@@ -143,7 +144,6 @@ class SlackUserManager:
                     dm_id=data['dm_id'],
                     last_update=data['last_update']
                 )
-
             else:
                 raw = await self._client.get_user_info(id_)
                 user = User(
@@ -151,7 +151,7 @@ class SlackUserManager:
                     raw=raw,
                     last_update=time.time()
                 )
-
+                self.add(user)
             if dm:
                 self.ensure_dm(user, db)
 
