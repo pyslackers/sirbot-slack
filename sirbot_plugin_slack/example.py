@@ -186,7 +186,7 @@ def register_slack_events():
     events = [
         {
             'func': hello_world,
-            'name': 'user_typing'
+            'event': 'user_typing'
         }
     ]
 
