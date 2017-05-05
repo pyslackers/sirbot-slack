@@ -1,0 +1,11 @@
+slack:
+  save:
+    messages: false
+    events: false
+    commands: false
+    actions: false
+  refresh:
+    user: 3600
+    channel: 3600
+  plugins:
+    - sirbot_plugin_slack.example

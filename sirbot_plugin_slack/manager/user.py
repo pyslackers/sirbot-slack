@@ -85,9 +85,10 @@ class SlackUserManager:
     Manager for the user object
     """
 
-    def __init__(self, client, facades):
+    def __init__(self, client, facades, refresh):
         self._client = client
         self._facades = facades
+        self._refresh = refresh
 
     async def add(self, user):
         """
@@ -117,27 +118,37 @@ class SlackUserManager:
         if id_.startswith('U'):
             db = self._facades.get('database')
             await db.execute('''SELECT id, dm_id, raw, last_update
-                                 FROM
-                                 slack_users
-                                 WHERE id = ?
-                              ''', (id_,))
+                                FROM
+                                slack_users
+                                WHERE id = ?
+                             ''',
+                             (id_,)
+                             )
             data = await db.fetchone()
 
-            if data is None or data['last_update'] < (time.time() - 3600)\
-                    or update:
+            if data and (
+                    update or data['last_update'] < time.time() - self._refresh
+            ):
                 raw = await self._client.get_user_info(id_)
                 user = User(
-                    id_=data['id'],
+                    id_=id_,
                     raw=raw,
-                    dm_id=data['dm_id'],
-                    last_update=time.time())
-
-                await self.add(user)
-            else:
+                    last_update=time.time(),
+                    dm_id=data['dm_id']
+                )
+            elif data:
                 user = User(
-                    id_=data['id'],
+                    id_=id_,
                     raw=json.loads(data['raw']),
                     dm_id=data['dm_id'],
+                    last_update=data['last_update']
+                )
+
+            else:
+                raw = await self._client.get_user_info(id_)
+                user = User(
+                    id_=id_,
+                    raw=raw,
                     last_update=time.time()
                 )
 
