@@ -13,13 +13,13 @@ Want to join? `Get an invite`_ !
 .. |build| image:: https://travis-ci.org/pyslackers/sirbot-slack.svg?branch=master
     :alt: Build status
     :target: https://travis-ci.org/pyslackers/sirbot-slack
-.. |doc| image:: https://readthedocs.org/projects/sirbot-plugin-slack//badge/?version=latest
+.. |doc| image:: https://readthedocs.org/projects/sirbot-plugin-slack/badge/?version=latest
     :alt: Documentation status
-    :target: https://readthedocs.org/projects/sirbot-plugin-slack/en/latest
+    :target: http://sirbot-plugin-slack.readthedocs.io/en/latest/
 .. |icon| image:: icon/icon-500.png
     :width: 10%
     :alt: Sir-bot-a-lot slack plugin icon
-    :target: https://readthedocs.org/projects/sirbot-plugin-slack/en/latest
+    :target: http://sirbot-plugin-slack.readthedocs.io/en/latest/
 
 Installation
 ------------

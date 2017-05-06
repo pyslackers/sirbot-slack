@@ -1,1 +1,1 @@
--e git+https://github.com/pyslackers/sir-bot-a-lot.git
+-e git+https://github.com/pyslackers/sir-bot-a-lot.git#egg=sirbot
