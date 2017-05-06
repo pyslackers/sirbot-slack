@@ -1,6 +1,6 @@
+import json
 import logging
 import time
-import json
 
 from ..hookimpl import hookimpl
 from ..errors import SlackAPIError, SlackChannelNotFound

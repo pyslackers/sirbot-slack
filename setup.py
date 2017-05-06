@@ -12,7 +12,7 @@ if sys.version_info < (3, 5):
 
 
 def load_package_meta():
-    meta_path = convert_path('./sirbot_plugin_slack/__meta__.py')
+    meta_path = convert_path('./sirbot/slack/__meta__.py')
     meta_ns = {}
     with open(meta_path) as f:
         exec(f.read(), meta_ns)
@@ -61,19 +61,19 @@ setup(
         'slack',
     ],
     packages=[
-        'sirbot_plugin_slack',
-        'sirbot_plugin_slack.dispatcher',
-        'sirbot_plugin_slack.manager',
-        'sirbot_plugin_slack.message',
+        'sirbot.slack',
+        'sirbot.slack.dispatcher',
+        'sirbot.slack.manager',
+        'sirbot.slack.message',
     ],
     package_dir={
-        'sirbot_plugin_slack': 'sirbot_plugin_slack',
-        'dispatcher': 'sirbot_plugin_slack/dispatcher',
-        'manager': 'sirbot_plugin_slack/manager',
-        'message': 'sirbot_plugin_slack/message',
+        'sirbot.slack': 'sirbot/slack',
+        'sirbot.slack.dispatcher': 'sirbot/slack/dispatcher',
+        'sirbot.slack.manager': 'sirbot/slack/manager',
+        'sirbot.slack.message': 'sirbot/slack/message',
     },
     package_data={
-        'sirbot_plugin_slack': ['config.yml']
+        'sirbot.slack': ['config.yml']
     },
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and

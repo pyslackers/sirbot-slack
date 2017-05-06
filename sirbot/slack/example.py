@@ -3,8 +3,8 @@ import re
 
 import aiohttp
 
-from .hookimpl import hookimpl
 from .message import Attachment, Field, Button, Select
+from .hookimpl import hookimpl
 
 logger = logging.getLogger('sirbot.slack')
 

@@ -4,7 +4,7 @@ import json
 import logging
 
 from aiohttp.web import Response
-from sirbot.utils import ensure_future
+from sirbot.core.utils import ensure_future
 
 from ..message.action import SlackAction
 

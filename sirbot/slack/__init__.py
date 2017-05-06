@@ -1,11 +1,9 @@
+from sirbot.core.hookimpl import hookimpl as sirbothook
 from .core import SirBotSlack
-
-from sirbot.hookimpl import hookimpl
-
 
 __version__ = SirBotSlack.__version__
 
 
-@hookimpl
+@sirbothook
 def plugins(loop):
     return SirBotSlack(loop=loop)

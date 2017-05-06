@@ -11,7 +11,7 @@ DATA = {
     "copyright": 'Copyright 2016 Python Developers Community',
     "description": 'Slack plugin for the good Sir Bot a lot',
     "license": 'MIT',
-    "name": 'sirbot_plugin_slack',
+    "name": 'sirbot.slack',
     "url": 'https://gitlab.com/PythonDevCommunity/sirbot-plugin-slack',
     # Versions should comply with PEP440. For a discussion on
     # single-sourcing the version across setup.py and the project code,
