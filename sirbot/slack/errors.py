@@ -1,4 +1,4 @@
-from sirbot.errors import MessageError, SirBotALotError
+from sirbot.core.errors import MessageError, SirBotALotError
 
 
 class SlackClientError(SirBotALotError):

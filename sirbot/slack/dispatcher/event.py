@@ -5,7 +5,7 @@ import json
 import time
 
 from collections import defaultdict
-from sirbot.utils import ensure_future
+from sirbot.core.utils import ensure_future
 
 
 logger = logging.getLogger('sirbot.slack')

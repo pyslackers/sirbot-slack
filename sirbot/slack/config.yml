@@ -8,4 +8,4 @@ slack:
     user: 3600
     channel: 3600
   plugins:
-    - sirbot_plugin_slack.example
+    - sirbot.example

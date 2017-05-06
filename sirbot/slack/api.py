@@ -5,7 +5,7 @@ import aiohttp
 
 from typing import Any, AnyStr, Dict, Optional
 
-from sirbot.utils import ensure_future
+from sirbot.core.utils import ensure_future
 from .errors import (
     SlackConnectionError,
     SlackServerError,
