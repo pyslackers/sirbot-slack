@@ -22,13 +22,7 @@ def load_package_meta():
 PKG_META = load_package_meta()
 
 
-requirements = [
-    'PyYAML==3.12'
-    # TODO: put package requirements here
-]
-
-
-def parse_reqs(req_path='./requirements.txt'):
+def parse_reqs(req_path='./requirements/requirements.txt'):
     """Recursively parse requirements from nested pip files."""
     install_requires = []
     with codecs.open(req_path, 'r') as handle:
@@ -41,7 +35,6 @@ def parse_reqs(req_path='./requirements.txt'):
             if line.startswith('-r'):
                 # recursively call this function
                 install_requires += parse_reqs(req_path=line[3:])
-
             else:
                 # add the line as a new requirement
                 install_requires.append(line)
@@ -94,7 +87,7 @@ setup(
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     include_package_data=True,
-    install_requires=parse_reqs(),
+    install_requires=parse_reqs('./requirements/requirements.txt'),
     zip_safe=False,
     tests_require=[
         'pytest-runner',
@@ -102,10 +95,9 @@ setup(
         'pytest-aiohttp',
         'pytest',
     ],
-    setup_requires=[
-        'pytest-runner',
-        'flake8',
-    ],
+    extras_require={
+        'dev': parse_reqs('./requirements/requirements_dev.txt')
+    },
     # See: http://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
