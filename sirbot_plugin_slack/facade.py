@@ -146,9 +146,14 @@ class SlackFacade:
             await db.execute(query, (msg.conversation_id, msg.timestamp))
 
         raw_msgs = await db.fetchall()
-        return [
-            await SlackMessage.from_raw(json.loads(raw_msg['raw']), slack=self)
-            for raw_msg in raw_msgs]
+        messages = list()
+        for message in raw_msgs:
+            m = await SlackMessage.from_raw(
+                json.loads(message['raw']),
+                slack=self
+            )
+            messages.append(m)
+        return messages
 
     async def _save_outgoing_message(self, message):
         """
