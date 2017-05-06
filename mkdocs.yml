@@ -1,6 +1,0 @@
----
-site_name: sirbot slack plugin Docs
-repo_url: https://gitlab.com/PythonDevCommunity/sirbot-plugin-slack
-dev_addr: "0.0.0.0:4000"
-theme: bootstrap
-docs_dir: docs

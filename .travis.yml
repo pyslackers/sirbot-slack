@@ -1,0 +1,29 @@
+language: python
+
+python:
+  - "3.6"
+  - "3.7-dev"
+  - "nightly"
+
+matrix:
+  allow_failures:
+    - python: "3.7-dev"
+    - python: "nightly"
+
+install:
+  - pip install git+https://github.com/pyslackers/sir-bot-a-lot.git
+  - pip install -r requirements/requirements.txt
+  - pip install -r requirements/requirements_dev.txt
+
+script:
+  - python setup.py flake8
+  - python setup.py test
+  - python setup.py doc
+
+deploy:
+  provider: script
+  script: curl -X POST http://readthedocs.org/build/sirbot-plugin-slack
+  on:
+    repo: pyslackers/sirbot-slack
+    branch: master
+    python: "3.6"
