@@ -4,11 +4,11 @@ import json
 import logging
 
 from aiohttp.web import Response
-from sirbot.core.utils import ensure_future
+from sirbot.utils import ensure_future
 
 from ..message.command import SlackCommand
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class SlackCommandDispatcher:

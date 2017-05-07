@@ -5,7 +5,7 @@ import time
 from ..hookimpl import hookimpl
 from ..errors import SlackAPIError, SlackChannelNotFound
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class Channel:
@@ -109,18 +109,15 @@ class SlackChannelManager:
         self._refresh = refresh
         self._channels = dict()
 
-    async def add(self, channel, *, db=None):
-        """
-        Add a channel to the channel manager
-        """
-        db = db or self._facades.get('database')
-        await db.execute(
-            '''INSERT OR REPLACE INTO slack_channels (id, name, is_member,
-             is_archived, raw, last_update) VALUES (?, ?, ?, ?, ?, ?)''',
-            (channel.id, channel.name, channel.member, channel.archived,
-             json.dumps(channel.raw), channel.last_update)
-        )
-        await db.commit()
+    async def all(self):
+
+        channels = list()
+        channels_raw = await self._client.get_channels()
+        for channel_raw in channels_raw:
+            channel = await self.get(channel_raw['id'])
+            channels.append(channel)
+
+        return channels
 
     async def get(self, id_=None, name=None, update=False):
         """
@@ -180,7 +177,7 @@ class SlackChannelManager:
 
     async def _find_by_id(self, id_):
         if id_.startswith('C'):
-            data = await self._client.get_channel_info(id_)
+            data = await self._client.get_channel(id_)
         else:
             try:
                 data = await self._client.get_group_info(id_)
@@ -193,6 +190,32 @@ class SlackChannelManager:
                     raise
 
         return data
+
+    async def delete(self, id_):
+        """
+        Delete a channel from the channel manager
+
+        :param id_: id of the channel
+        :param name: name of the channel
+        :return: None
+        """
+        db = self._facades.get('database')
+        await db.execute('''DELETE FROM slack_channels WHERE id = ?
+                          ''', (id_,))
+        await db.commit()
+
+    async def add(self, channel, *, db=None):
+        """
+        Add a channel to the channel manager
+        """
+        db = db or self._facades.get('database')
+        await db.execute(
+            '''INSERT OR REPLACE INTO slack_channels (id, name, is_member,
+             is_archived, raw, last_update) VALUES (?, ?, ?, ?, ?, ?)''',
+            (channel.id, channel.name, channel.member, channel.archived,
+             json.dumps(channel.raw), channel.last_update)
+        )
+        await db.commit()
 
     async def _get_by_name(self, name, db):
         await db.execute('''SELECT id, raw, last_update FROM slack_channels
@@ -213,24 +236,11 @@ class SlackChannelManager:
     async def _update(self, data):
 
         if data['id'].startswith('C'):
-            data = await self._client.get_channel_info(data['id'])
+            data = await self._client.get_channel(data['id'])
         else:
             data = dict()
 
         return data
-
-    async def delete(self, id_):
-        """
-        Delete a channel from the channel manager
-
-        :param id_: id of the channel
-        :param name: name of the channel
-        :return: None
-        """
-        db = self._facades.get('database')
-        await db.execute('''DELETE FROM slack_channels WHERE id = ?
-                          ''', (id_,))
-        await db.commit()
 
 
 async def channel_archive(event, slack, facades):
