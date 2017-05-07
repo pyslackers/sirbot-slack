@@ -4,7 +4,7 @@ import time
 
 from ..hookimpl import hookimpl
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class User:

@@ -5,7 +5,7 @@ import aiohttp
 
 from typing import Any, AnyStr, Dict, Optional
 
-from sirbot.core.utils import ensure_future
+from sirbot.utils import ensure_future
 from .errors import (
     SlackConnectionError,
     SlackServerError,
@@ -13,7 +13,7 @@ from .errors import (
     SlackAPIError
 )
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class APIPath:
@@ -281,7 +281,7 @@ class HTTPClient(APICaller):
         msg['timestamp'] = msg['ts']
         return msg
 
-    async def get_channels(self):
+    async def get_channels(self, members=False, archived=False):
         """
         Query all available channels in the teams and identify in witch
         channel the bot is present.
@@ -291,11 +291,29 @@ class HTTPClient(APICaller):
         team.
         """
         logger.debug('Getting channels')
-
-        rep = await self._do_post(APIPath.CHANNEL_GET, msg={})
+        data = {
+            'exclude_members': members,
+            'exclude_archived': archived
+        }
+        rep = await self._do_post(APIPath.CHANNEL_GET, msg=data)
         channels = [data for data in rep.get('channels', [])]
 
         return channels
+
+    async def get_channel(self, channel_id: str):
+        """
+        Query the information about a channel
+
+        :param channel_id: id of the channel to query
+        :return: information
+        :rtype: dict
+        """
+        msg = {
+            'channel': channel_id
+        }
+
+        rep = await self._do_post(APIPath.CHANNEL_INFO, msg=msg)
+        return rep['channel']
 
     async def find_channel(self, name):
         logger.debug('Finding channel: %s', name)
@@ -313,23 +331,8 @@ class HTTPClient(APICaller):
             for channel in data.get('channels', data.get('groups', [])):
                 if name == channel.get('name'):
                     if channel['id'].startswith('C'):
-                        channel = await self.get_channel_info(channel['id'])
+                        channel = await self.get_channel(channel['id'])
                     return channel
-
-    async def get_channel_info(self, channel_id: str):
-        """
-        Query the information about a channel
-
-        :param channel_id: id of the channel to query
-        :return: information
-        :rtype: dict
-        """
-        msg = {
-            'channel': channel_id
-        }
-
-        rep = await self._do_post(APIPath.CHANNEL_INFO, msg=msg)
-        return rep['channel']
 
     async def get_group_info(self, group_id: str):
         """

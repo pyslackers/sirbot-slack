@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import time
 
 from aiohttp.web import Response
 
@@ -9,10 +8,8 @@ from .action import SlackActionDispatcher
 from .command import SlackCommandDispatcher
 from .event import SlackEventDispatcher
 from .message import SlackMessageDispatcher
-from ..manager.channel import Channel
-from ..manager.user import User
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class SlackMainDispatcher:
@@ -167,26 +164,3 @@ class SlackMainDispatcher:
         )
 
         self.started = True
-
-    async def _parse_channels(self, channels):
-        """
-        Parse the channels at login and add them to the channel manager if
-        the bot is in them
-        """
-
-        now = time.time()
-        for channel in channels:
-            c = Channel(
-                id_=channel['id'],
-                raw=channel,
-                last_update=now,
-            )
-            await self._channels.add(c)
-
-    async def _parse_users(self, users):
-        """
-        Parse the users at login and add them in the user manager
-        """
-        for user in users:
-            u = User(id_=user['id'], raw=user, last_update=time.time())
-            await self._users.add(u)

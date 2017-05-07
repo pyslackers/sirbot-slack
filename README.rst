@@ -75,5 +75,9 @@ The default configuration for sirbot-slack look like this:
       refresh:
         user: 3600
         channel: 3600
+      endpoints:
+        commands: "/slack/commands"
+        actions: "/slack/actions"
       plugins:
-        - sirbot_plugin_slack.example
+        - sirbot.slack.example
+

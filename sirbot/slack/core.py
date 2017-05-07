@@ -6,8 +6,8 @@ import pluggy
 import yaml
 
 from aiohttp.web import Response
-from sirbot.core.utils import merge_dict
-from sirbot.core.plugin import Plugin
+from sirbot.utils import merge_dict
+from sirbot.core import Plugin
 
 from . import hookspecs
 from .dispatcher import SlackMainDispatcher
@@ -17,7 +17,7 @@ from .errors import SlackClientError, SlackSetupError
 from .facade import SlackFacade
 from .manager import SlackChannelManager, SlackUserManager
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 MANDATORY_PLUGIN = ['sirbot.slack.manager.user',
                     'sirbot.slack.manager.channel']
@@ -66,8 +66,23 @@ class SirBotSlack(Plugin):
         self._session = session
         self._facades = facades
 
-        self._router.add_route('POST', '/commands', self._incoming_command)
-        self._router.add_route('POST', '/buttons', self._incoming_button)
+        if self._config['endpoints']['commands']:
+            logger.debug('Adding commands endpoint: %s',
+                         self._config['endpoints']['commands'])
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['commands'],
+                self._incoming_command
+            )
+
+        if self._config['endpoints']['actions']:
+            logger.debug('Adding actions endpoint: %s',
+                         self._config['endpoints']['actions'])
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['actions'],
+                self._incoming_button
+            )
 
         self._bot_token = os.environ.get('SIRBOT_SLACK_BOT_TOKEN', '')
         self._app_token = os.environ.get('SIRBOT_SLACK_TOKEN', '')

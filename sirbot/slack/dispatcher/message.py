@@ -12,7 +12,7 @@ from collections import defaultdict
 from ..message import SlackMessage
 
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class SlackMessageDispatcher:

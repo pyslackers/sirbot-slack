@@ -5,7 +5,7 @@ import sqlite3
 from .message.message import SlackMessage
 from .manager.user import User
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 class SlackFacade:

@@ -6,7 +6,7 @@ import aiohttp
 from .message import Attachment, Field, Button, Select
 from .hookimpl import hookimpl
 
-logger = logging.getLogger('sirbot.slack')
+logger = logging.getLogger(__name__)
 
 
 async def react(message, slack, _, facade):

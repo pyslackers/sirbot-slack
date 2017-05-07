@@ -1,4 +1,4 @@
-from sirbot.core.hookimpl import hookimpl as sirbothook
+from sirbot.core import hookimpl as sirbothook
 from .core import SirBotSlack
 
 __version__ = SirBotSlack.__version__
