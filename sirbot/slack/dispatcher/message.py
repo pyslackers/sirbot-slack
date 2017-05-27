@@ -2,13 +2,13 @@ import logging
 import asyncio
 import re
 import inspect
-import json
 import functools
 import time
 import sqlite3
 
 from collections import defaultdict
 
+from .. import database
 from ..message import SlackMessage
 
 
@@ -69,24 +69,16 @@ class SlackMessageDispatcher:
         """
         Save incoming message in db
 
-        :param msg: message
+        :param message: message
         :param db: db facade
         :return: None
         """
         logger.debug('Saving incoming msg from %s to %s at %s',
                      message.frm.id, message.to.id, message.timestamp)
 
-        await db.execute('''INSERT INTO slack_messages
-                          (ts, from_id, to_id, type, conversation, mention,
-                          text, raw)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                          ''',
-                         (message.timestamp, message.frm.id, message.to.id,
-                          message.subtype, message.conversation,
-                          message.mention, message.text,
-                          json.dumps(message.raw))
-                         )
-
+        await database.__dict__[db.type].dispatcher.save_incoming_message(
+            db, message
+        )
         await db.commit()
 
     async def _save_update_incoming(self, message, db):
@@ -105,10 +97,7 @@ class SlackMessageDispatcher:
         try:
             await self._save_incoming(message, db)
         except sqlite3.IntegrityError:
-            await db.execute('''UPDATE slack_messages SET raw=?
-                                WHERE ts=?''',
-                             (json.dumps(message.raw), message.timestamp)
-                             )
+            await database.__dict__[db.type].dispatcher.update_raw(db, message)
             await db.commit()
 
     def _register(self, pm):
@@ -206,8 +195,6 @@ class SlackMessageDispatcher:
             }
 
     async def _update_conversation_id(self, msg, db):
-        await db.execute('''UPDATE slack_messages SET conversation=?
-                             WHERE ts=?'''
-                         , (msg.conversation, msg.timestamp)
-                         )
+        await database.__dict__[db.type].dispatcher.update_conversation_id(
+            db, msg)
         await db.commit()

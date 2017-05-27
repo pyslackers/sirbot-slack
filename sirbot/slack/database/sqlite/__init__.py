@@ -1,6 +1,6 @@
 # flake8: noqa
 
-from . import user, channel, group, update
+from . import user, channel, group, update, dispatcher
 
 
 async def create_table(db):

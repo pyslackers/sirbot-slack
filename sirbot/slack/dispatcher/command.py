@@ -6,6 +6,7 @@ import logging
 from aiohttp.web import Response
 from sirbot.utils import ensure_future
 
+from .. import database
 from ..message.command import SlackCommand
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,12 @@ class SlackCommandDispatcher:
 
         if isinstance(self._save, list) and data['command'] in self._save \
                 or self._save is True:
+            logger.debug('Saving incoming command %s from %s',
+                         command.command, command.frm.id)
             db = facades.get('database')
-            await self._save_incoming(command, db)
+            await database.__dict__[db.type].message.save_incoming_command(
+                db, command)
+            await db.commit()
 
         couroutine = command_settings['func'](command, slack, facades)
         ensure_future(coroutine=couroutine, loop=self._loop, logger=logger)
@@ -61,20 +66,6 @@ class SlackCommandDispatcher:
             )
         else:
             return Response(status=200)
-
-    async def _save_incoming(self, command, db):
-        logger.debug('Saving incoming command %s from %s',
-                     command.command, command.frm.id)
-
-        await db.execute('''INSERT INTO slack_commands
-                            (ts, to_id, from_id, command, text, raw) VALUES
-                            (? ,?, ?, ?, ?, ?)''',
-                         (command.timestamp, command.to.id,
-                          command.frm.id, command.command, command.text,
-                          json.dumps(command.raw))
-                         )
-
-        await db.commit()
 
     def _register(self, pm):
         """

@@ -6,6 +6,7 @@ import logging
 from aiohttp.web import Response
 from sirbot.utils import ensure_future
 
+from .. import database
 from ..message.action import SlackAction
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,13 @@ class SlackActionDispatcher:
 
         if isinstance(self._save, list) and data['callback_id'] in self._save \
                 or self._save is True:
+            logger.debug('Saving incoming action %s from %s',
+                         action.callback_id,
+                         action.frm.id)
             db = facades.get('database')
-            await self._save_incoming(action, db)
+            await database.__dict__[db.type].message.save_incoming_action(
+                db, action)
+            await db.commit()
 
         couroutine = action_settings['func'](action, slack, facades)
         ensure_future(coroutine=couroutine, loop=self._loop, logger=logger)
@@ -61,18 +67,6 @@ class SlackActionDispatcher:
             )
         else:
             return Response(status=200)
-
-    async def _save_incoming(self, action, db):
-        logger.debug('Saving incoming action %s from %s', action.callback_id,
-                     action.frm.id)
-
-        await db.execute('''INSERT INTO slack_actions
-                            (ts, to_id, from_id, callback_id, action, raw)
-                            VALUES (?, ?, ?, ?, ?, ?)''',
-                         (action.ts, action.to.id, action.frm.id,
-                          action.callback_id, json.dumps(action.action),
-                          json.dumps(action.raw))
-                         )
 
     def _register(self, pm):
         """

@@ -1,9 +1,9 @@
 import logging
 import asyncio
 import inspect
-import json
 import time
 
+from .. import database
 from collections import defaultdict
 from sirbot.utils import ensure_future
 
@@ -82,9 +82,8 @@ class SlackEventDispatcher:
             user = user.get('id')
 
         logger.debug('Saving incoming event %s from %s', event_type, user)
+        await database.__dict__[db.type].dispatcher.save_incoming_event(
+            event_type=event_type, ts=ts, user=user, event=event, db=db
+        )
 
-        await db.execute('''INSERT INTO slack_events (ts, from_id, type, raw)
-                            VALUES (?, ?, ?, ?)''',
-                         (ts, user, event_type, json.dumps(event))
-                         )
         await db.commit()
