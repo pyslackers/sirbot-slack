@@ -9,18 +9,19 @@ from aiohttp.web import Response
 from sirbot.utils import merge_dict
 from sirbot.core import Plugin
 
-from . import hookspecs
+from . import hookspecs, database
 from .dispatcher import SlackMainDispatcher
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
 from .errors import SlackClientError, SlackSetupError
 from .facade import SlackFacade
-from .manager import SlackChannelManager, SlackUserManager
+from .store import ChannelStore, UserStore, GroupStore
 
 logger = logging.getLogger(__name__)
 
-MANDATORY_PLUGIN = ['sirbot.slack.manager.user',
-                    'sirbot.slack.manager.channel']
+MANDATORY_PLUGIN = ['sirbot.slack.store.user',
+                    'sirbot.slack.store.channel',
+                    'sirbot.slack.store.group']
 
 
 class SirBotSlack(Plugin):
@@ -43,6 +44,7 @@ class SirBotSlack(Plugin):
         self._http_client = None
         self._users = None
         self._channels = None
+        self._groups = None
         self._dispatcher = None
 
     @property
@@ -125,16 +127,22 @@ class SirBotSlack(Plugin):
                 'No bot token. Sir-bot-a-lot will not connect to the RTM API'
             )
 
-        self._users = SlackUserManager(
+        self._users = UserStore(
             client=self._http_client,
             facades=self._facades,
             refresh=self._config['refresh']['user']
         )
 
-        self._channels = SlackChannelManager(
+        self._channels = ChannelStore(
             client=self._http_client,
             facades=self._facades,
             refresh=self._config['refresh']['channel']
+        )
+
+        self._groups = GroupStore(
+            client=self._http_client,
+            facades=self._facades,
+            refresh=self._config['refresh']['group']
         )
 
         self._dispatcher = SlackMainDispatcher(
@@ -159,6 +167,7 @@ class SirBotSlack(Plugin):
             http_client=self._http_client,
             users=self._users,
             channels=self._channels,
+            groups=self._groups,
             bot=self._dispatcher.bot,
             facades=self._facades
         )
@@ -229,114 +238,13 @@ class SirBotSlack(Plugin):
     async def database_update(self, metadata, db):
 
         if metadata['version'] == '0.0.5':
-
-            await db.execute('''ALTER TABLE slack_commands
-                                RENAME TO slack_commands_tmp''')
-
-            await db.execute('''CREATE TABLE IF NOT EXISTS slack_commands (
-            ts REAL,
-            to_id TEXT,
-            from_id TEXT,
-            command TEXT,
-            text TEXT,
-            raw TEXT,
-            PRIMARY KEY (ts, to_id, from_id, command)
-            )''')
-
-            await db.execute('''INSERT INTO slack_commands
-                                (ts, to_id, from_id, command, text, raw)
-                                SELECT ts, channel, user, command, text, raw
-                                FROM slack_commands_tmp''')
-
-            await db.execute('''DROP TABLE slack_commands_tmp''')
-
-            await db.execute('''ALTER TABLE slack_actions
-                                RENAME TO slack_actions_tmp''')
-
-            await db.execute('''CREATE TABLE IF NOT EXISTS slack_actions (
-            ts REAL,
-            to_id TEXT,
-            from_id TEXT,
-            callback_id TEXT,
-            action TEXT,
-            raw TEXT,
-            PRIMARY KEY (ts, to_id, from_id)
-            )''')
-
-            await db.execute('''INSERT INTO slack_actions
-                                (ts, to_id, from_id, callback_id, action, raw)
-                                SELECT ts, channel, user, callback_id, action,
-                                 raw
-                                FROM slack_actions_tmp''')
-
-            await db.execute('''DROP TABLE slack_actions_tmp''')
-
+            await database.__dict__[db.type].update.update_005(db)
             metadata['version'] = '0.0.6'
 
         return self.__version__
 
     async def _create_db_table(self):
         db = self._facades.get('database')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_users (
-        id TEXT PRIMARY KEY NOT NULL,
-        dm_id TEXT,
-        admin BOOLEAN DEFAULT FALSE,
-        raw TEXT,
-        last_update REAL
-        )
-        ''')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_channels (
-        id TEXT PRIMARY KEY NOT NULL,
-        name TEXT UNIQUE,
-        is_member BOOLEAN,
-        is_archived BOOLEAN,
-        raw TEXT,
-        last_update REAL
-        )
-        ''')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
-        ts REAL,
-        from_id TEXT,
-        to_id TEXT,
-        type TEXT,
-        conversation REAL,
-        mention BOOLEAN,
-        text TEXT,
-        raw TEXT,
-        PRIMARY KEY (ts, from_id, type)
-        )
-        ''')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_events (
-        ts REAL,
-        from_id TEXT,
-        type TEXT,
-        raw TEXT,
-        PRIMARY KEY (ts, type)
-        )''')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_commands (
-        ts REAL,
-        to_id TEXT,
-        from_id TEXT,
-        command TEXT,
-        text TEXT,
-        raw TEXT,
-        PRIMARY KEY (ts, to_id, from_id, command)
-        )''')
-
-        await db.execute('''CREATE TABLE IF NOT EXISTS slack_actions (
-        ts REAL,
-        to_id TEXT,
-        from_id TEXT,
-        callback_id TEXT,
-        action TEXT,
-        raw TEXT,
-        PRIMARY KEY (ts, to_id, from_id)
-        )''')
-
+        await database.__dict__[db.type].create_table(db)
         await db.set_plugin_metadata(self)
         await db.commit()

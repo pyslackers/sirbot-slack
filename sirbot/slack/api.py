@@ -315,26 +315,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.CHANNEL_INFO, msg=msg)
         return rep['channel']
 
-    async def find_channel(self, name):
-        logger.debug('Finding channel: %s', name)
-        msg = {'exclude_members': True}
-
-        f = [
-            self._do_post(APIPath.CHANNEL_GET, msg=msg),
-            self._do_post(APIPath.GROUP_GET)
-        ]
-
-        tasks, _ = await asyncio.wait(f, return_when=asyncio.ALL_COMPLETED)
-
-        for task in tasks:
-            data = task.result()
-            for channel in data.get('channels', data.get('groups', [])):
-                if name == channel.get('name'):
-                    if channel['id'].startswith('C'):
-                        channel = await self.get_channel(channel['id'])
-                    return channel
-
-    async def get_group_info(self, group_id: str):
+    async def get_group(self, group_id: str):
         """
         Query the information about a channel
 

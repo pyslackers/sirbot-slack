@@ -52,7 +52,7 @@ class SlackEventDispatcher:
 
         hookspecs: def register_slack_events()
 
-        :param pm: pluggy plugin manager
+        :param pm: pluggy plugin store
         :return None
         """
         all_events = pm.hook.register_slack_events()

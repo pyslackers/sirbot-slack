@@ -26,12 +26,12 @@ class SlackAPIError(SlackClientError):
         self.response = response
 
 
-class SlackChannelNotFound(SlackClientError):
-    """Channel non existent or not available to the bot"""
-
-    def __init__(self, id_=None, name=None):
-        self.id = id_
-        self.name = name
+# class SlackChannelNotFound(SlackClientError):
+#     """Channel non existent or not available to the bot"""
+#
+#     def __init__(self, id_=None, name=None):
+#         self.id = id_
+#         self.name = name
 
 
 class SlackMessageError(MessageError):

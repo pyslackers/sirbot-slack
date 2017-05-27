@@ -2,7 +2,7 @@ import json
 import logging
 
 from ..errors import SlackMessageError
-from ..manager.user import User
+from ..store.user import User
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -120,9 +120,12 @@ class SlackMessage:
         if channel_id.startswith('D'):
             mention = True
             to = slack.bot
-        else:
+        elif channel_id.startswith('C'):
             mention = False
             to = await slack.channels.get(channel_id)
+        else:
+            mention = False
+            to = await slack.groups.get(channel_id)
 
         if slack.bot.id in text:
             mention = True

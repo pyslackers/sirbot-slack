@@ -63,14 +63,18 @@ setup(
     packages=[
         'sirbot.slack',
         'sirbot.slack.dispatcher',
-        'sirbot.slack.manager',
+        'sirbot.slack.store',
         'sirbot.slack.message',
+        'sirbot.slack.database',
+        'sirbot.slack.database.sqlite'
     ],
     package_dir={
         'sirbot.slack': 'sirbot/slack',
         'sirbot.slack.dispatcher': 'sirbot/slack/dispatcher',
-        'sirbot.slack.manager': 'sirbot/slack/manager',
+        'sirbot.slack.store': 'sirbot/slack/store',
         'sirbot.slack.message': 'sirbot/slack/message',
+        'sirbot.slack.database': 'sirbot/slack/database',
+        'sirbot.slack.database.sqlite': 'sirbot/slack/database/sqlite',
     },
     package_data={
         'sirbot.slack': ['config.yml']

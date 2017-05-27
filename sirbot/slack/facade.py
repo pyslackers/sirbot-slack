@@ -3,7 +3,7 @@ import logging
 import sqlite3
 
 from .message.message import SlackMessage
-from .manager.user import User
+from .store.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +16,13 @@ class SlackFacade:
     allow cross service messages
     """
 
-    def __init__(self, http_client, users, channels, bot, facades):
+    def __init__(self, http_client, users, channels, groups, bot, facades):
         self._facades = facades
         self._http_client = http_client
 
         self.users = users
         self.channels = channels
+        self.groups = groups
         self.bot = bot
 
     async def send(self, *messages):
