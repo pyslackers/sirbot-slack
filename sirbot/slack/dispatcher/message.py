@@ -1,37 +1,38 @@
-import logging
 import asyncio
-import re
-import inspect
 import functools
-import time
+import inspect
+import logging
+import re
 import sqlite3
-
+import time
 from collections import defaultdict
 
+from .dispatcher import SlackDispatcher
 from .. import database
 from ..message import SlackMessage
-
 
 logger = logging.getLogger(__name__)
 
 
-class SlackMessageDispatcher:
-    def __init__(self, users, channels, bot, pm, save=None, *, loop):
+class MessageDispatcher(SlackDispatcher):
+    def __init__(self, http_client, users, channels, groups, plugins, facades,
+                 save, loop, bot):
 
-        if not save:
-            save = []
-
-        self.commands = defaultdict(list)
-        self.callbacks = dict()
         self.bot = bot
-        self._users = users
-        self._channels = channels
-        self._loop = loop
-        self._save = save
+        self._callbacks = dict()
 
-        self._register(pm)
+        super().__init__(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=save,
+            loop=loop
+        )
 
-    async def incoming(self, msg, slack_facade, facades):
+    async def incoming(self, msg):
         """
         Handler for the incoming events of type 'message'
 
@@ -43,16 +44,18 @@ class SlackMessageDispatcher:
         """
         logger.debug('Message handler received %s', msg)
 
-        message = await SlackMessage.from_raw(msg, slack_facade)
+        facades = self._facades.new()
+        slack = facades.get('slack')
+        message = await SlackMessage.from_raw(msg, slack)
         db = facades.get('database')
 
         if not message.frm:  # Message without frm (i.e: slackbot)
             return
-        elif message.frm.id == self.bot.id:  # Skip message from self
-            await self._save_update_incoming(message, db)
-            return
+        # elif message.frm.id == self.bot.id:  # Skip message from self
+        #     await self._save_update_incoming(message, db)
+        #     return
 
-        if isinstance(self._save, list) and message.subtype in self._save\
+        if isinstance(self._save, list) and message.subtype in self._save \
                 or self._save is True:
             await self._save_incoming(message, db)
 
@@ -63,7 +66,7 @@ class SlackMessageDispatcher:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
-        await self._dispatch(message, slack_facade, facades, db)
+        await self._dispatch(message, slack, facades, db)
 
     async def _save_incoming(self, message, db):
         """
@@ -100,7 +103,7 @@ class SlackMessageDispatcher:
             await database.__dict__[db.type].dispatcher.update_raw(db, message)
             await db.commit()
 
-    def _register(self, pm):
+    def _register(self):
         """
         Find and register the functions handling specifics messages
 
@@ -108,7 +111,8 @@ class SlackMessageDispatcher:
 
         :param pm: pluggy plugin store
         """
-        all_messages = pm.hook.register_slack_messages()
+        self._endpoints = defaultdict(list)
+        all_messages = self._plugins.hook.register_slack_messages()
         for messages in all_messages:
             for msg in messages:
                 if not asyncio.iscoroutinefunction(msg['func']):
@@ -118,10 +122,12 @@ class SlackMessageDispatcher:
                              msg['match'],
                              msg['func'].__name__,
                              inspect.getabsfile(msg['func']))
-                msg['match'] = msg['match'].format(
-                    bot_name='<@{}>'.format(self.bot.id))
-                self.commands[re.compile(msg['match'],
-                                         msg.get('flags', 0))].append(msg)
+
+                if self.bot:
+                    msg['match'] = msg['match'].format(
+                        bot_name='<@{}>'.format(self.bot.id))
+                self._endpoints[re.compile(msg['match'],
+                                           msg.get('flags', 0))].append(msg)
 
     async def _dispatch(self, msg, slack_facade, facades, db):
         """
@@ -134,19 +140,19 @@ class SlackMessageDispatcher:
         """
         handlers = list()
 
-        if msg.frm.id in self.callbacks \
-                and msg.to.id in self.callbacks[msg.frm.id] \
-                and time.time() < self.callbacks[msg.frm.id][msg.to.id][
-                    'time'] + self.callbacks[msg.frm.id][msg.to.id]['timeout']:
+        if msg.frm.id in self._callbacks and msg.to.id in self._callbacks[
+            msg.frm.id] and time.time() < \
+                self._callbacks[msg.frm.id][msg.to.id]['time'] + \
+                self._callbacks[msg.frm.id][msg.to.id]['timeout']:
             logger.debug('Located callback for "{}" in "{}", invoking'.format(
                 msg.frm.id, msg.to.id))
-            msg.conversation_id = self.callbacks[msg.frm.id][msg.to.id]['id']
+            msg.conversation_id = self._callbacks[msg.frm.id][msg.to.id]['id']
             await self._update_conversation_id(msg, db)
-            handlers.append((self.callbacks[msg.frm.id][msg.to.id]['func'],
+            handlers.append((self._callbacks[msg.frm.id][msg.to.id]['func'],
                              'callback'))
-            del self.callbacks[msg.frm.id][msg.to.id]
+            del self._callbacks[msg.frm.id][msg.to.id]
         else:
-            for match, commands in self.commands.items():
+            for match, commands in self._endpoints.items():
                 n = match.search(msg.text)
                 if n:
                     for command in commands:
@@ -185,9 +191,9 @@ class SlackMessageDispatcher:
             timeout = result.get('timeout', 300)
             conversation_id = msg.conversation_id or msg.timestamp
 
-            if frm.id not in self.callbacks:
-                self.callbacks[frm.id] = dict()
-            self.callbacks[frm.id][to.id] = {
+            if frm.id not in self._callbacks:
+                self._callbacks[frm.id] = dict()
+            self._callbacks[frm.id][to.id] = {
                 'func': callback,
                 'time': time.time(),
                 'timeout': timeout,

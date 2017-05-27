@@ -39,6 +39,10 @@ class APIPath:
 
     USER_INFO = SLACK_API_ROOT.format('users.info')
 
+    BOT_INFO = SLACK_API_ROOT.format('bots.info')
+
+    AUTH_TEST = SLACK_API_ROOT.format('auth.test')
+
     IM_OPEN = SLACK_API_ROOT.format('im.open')
 
 
@@ -365,6 +369,14 @@ class HTTPClient(APICaller):
         )
 
         return rep['channel']['id']
+
+    async def get_bot_info(self, bot):
+        rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
+        return rep
+
+    async def info_self(self):
+        rep = await self._do_post(APIPath.RTM_CONNECT, token=self._bot_token)
+        return rep['self']
 
 
 class RTMClient(APICaller):

@@ -24,10 +24,10 @@ async def save_incoming_command(db, command):
                      )
 
 
-async def save_incoming_event(db, event_type, ts, user, event):
+async def save_incoming_event(db, ts, user, event):
     await db.execute('''INSERT INTO slack_events (ts, from_id, type, raw)
                         VALUES (?, ?, ?, ?)''',
-                     (ts, user, event_type, json.dumps(event))
+                     (ts, user, event['type'], json.dumps(event))
                      )
 
 

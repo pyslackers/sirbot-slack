@@ -38,5 +38,23 @@ class SlackMessageError(MessageError):
     """Generic slack message error"""
 
 
+class SlackUnknownEndpoint(MessageError):
+    """"""
+
+
+class SlackUnknownAction(SlackUnknownEndpoint):
+    """Unknown incoming action"""
+
+    def __init__(self, action):
+        self.action = action
+
+
+class SlackUnknownCommand(SlackUnknownEndpoint):
+    """Unknown incoming command"""
+
+    def __init__(self, command):
+        self.command = command
+
+
 class SlackSetupError(SirBotALotError):
     """Error during slack plugin configuration"""

@@ -6,78 +6,84 @@ import logging
 from aiohttp.web import Response
 from sirbot.utils import ensure_future
 
+from .dispatcher import SlackDispatcher
 from .. import database
+from ..errors import SlackUnknownAction
 from ..message.action import SlackAction
 
 logger = logging.getLogger(__name__)
 
 
-class SlackActionDispatcher:
-    def __init__(self, users, channels, pm, save, loop):
+class ActionDispatcher(SlackDispatcher):
+    def __init__(self, http_client, users, channels, groups, plugins, facades,
+                 save, loop, token):
 
-        if not save:
-            save = list()
-
-        self._users = users
-        self._channels = channels
-        self._pm = pm
-        self._save = save
-        self._loop = loop
-
-        self.actions = dict()
-
-        self._register(pm)
-
-    async def incoming(self, data, slack, facades):
-        logger.debug('Action handler received %s', data)
-
-        action_settings = self.actions.get(data['callback_id'])
-        data = {**data}
-
-        if not action_settings:
-            logger.warning('Incoming action (%s) with no handler',
-                           data['callback_id'])
-            return
-
-        action = await SlackAction.from_raw(
-            data,
-            slack,
-            settings=action_settings
+        super().__init__(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=save,
+            loop=loop
         )
 
-        if isinstance(self._save, list) and data['callback_id'] in self._save \
-                or self._save is True:
+        self._token = token
+
+    async def _incoming(self, request):
+        data = await request.post()
+
+        if 'payload' not in data:
+            return Response(text='Invalid', status=400)
+
+        payload = json.loads(data['payload'])
+
+        if 'token' not in payload or payload['token'] != self._token:
+            return Response(text='Invalid', status=400)
+
+        logger.debug('Action handler received: %s', payload)
+
+        facades = self._facades.new()
+        slack = facades.get('slack')
+        settings = self._endpoints.get(payload['callback_id'])
+
+        if not settings:
+            raise SlackUnknownAction(payload)
+
+        action = await SlackAction.from_raw(payload, slack, settings=settings)
+
+        if isinstance(self._save, list) and payload['callback_id'] \
+                in self._save or self._save is True:
             logger.debug('Saving incoming action %s from %s',
                          action.callback_id,
                          action.frm.id)
             db = facades.get('database')
-            await database.__dict__[db.type].message.save_incoming_action(
+            await database.__dict__[db.type].dispatcher.save_incoming_action(
                 db, action)
             await db.commit()
 
-        couroutine = action_settings['func'](action, slack, facades)
-        ensure_future(coroutine=couroutine, loop=self._loop, logger=logger)
+        coroutine = settings['func'](action, slack, facades)
+        ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
-        if action_settings.get('public'):
-            data = {"response_type": "in_channel"}
+        if settings.get('public'):
             return Response(
                 status=200,
-                body=json.dumps(data),
+                body=json.dumps({"response_type": "in_channel"}),
                 content_type='application/json; charset=utf-8'
             )
         else:
             return Response(status=200)
 
-    def _register(self, pm):
+    def _register(self):
         """
         Find and register the functions handling specifics events
 
         hookspecs: def register_slack_events()
 
-        :param pm: pluggy plugin store
         :return None
         """
-        all_actions = pm.hook.register_slack_actions()
+        all_actions = self._plugins.hook.register_slack_actions()
         for actions in all_actions:
             for action in actions:
                 if not asyncio.iscoroutinefunction(action['func']):
@@ -87,4 +93,4 @@ class SlackActionDispatcher:
                              action['callback_id'],
                              action['func'].__name__,
                              inspect.getabsfile(action['func']))
-                self.actions[action['callback_id']] = action
+                self._endpoints[action['callback_id']] = action

@@ -112,7 +112,7 @@ class SlackMessage:
             bot_id = data.get('bot_id')\
                 or data.get('message', {}).get('bot_id')
 
-            if bot_id == slack.bot.bot_id:
+            if bot_id == slack.bot.id:
                 frm = slack.bot
             else:
                 frm = None

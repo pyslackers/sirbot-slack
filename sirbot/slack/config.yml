@@ -9,7 +9,8 @@ slack:
     channel: 3600
     group: 3600
   endpoints:
-    commands: "/slack/commands"
-    actions: "/slack/actions"
+    commands: false
+    actions: false
+    events: false
   plugins:
     - sirbot.slack.example
