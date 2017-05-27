@@ -2,7 +2,6 @@ import logging
 import time
 
 from .message import SlackMessage
-from ..manager.channel import Channel
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -30,12 +29,10 @@ class SlackCommand:
     async def from_raw(cls, data, slack, timestamp=None, settings=None):
 
         frm = await slack.users.get(data['user_id'])
-        if data['channel_id'].startswith(('C', 'G')):
+        if data['channel_id'].startswith('C'):
             to = await slack.channels.get(data['channel_id'])
-
-            if not to:
-                to = Channel(id_=data['channel_id'])
-
+        elif data['channel_id'].startswith('G'):
+            to = await slack.groups.get(data['channel_id'])
         else:
             to = frm
 

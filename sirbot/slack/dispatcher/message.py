@@ -117,7 +117,7 @@ class SlackMessageDispatcher:
 
         hookspecs: def register_slack_events()
 
-        :param pm: pluggy plugin manager
+        :param pm: pluggy plugin store
         """
         all_messages = pm.hook.register_slack_messages()
         for messages in all_messages:

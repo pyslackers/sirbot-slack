@@ -7,6 +7,7 @@ slack:
   refresh:
     user: 3600
     channel: 3600
+    group: 3600
   endpoints:
     commands: "/slack/commands"
     actions: "/slack/actions"
