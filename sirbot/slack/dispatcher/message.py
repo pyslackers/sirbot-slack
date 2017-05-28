@@ -53,7 +53,7 @@ class MessageDispatcher(SlackDispatcher):
         if not message.frm:  # Message without frm (i.e: slackbot)
             logger.debug('Ignoring message without frm')
             return
-        elif message.frm.id in (self.bot.id, 'B00000000'):
+        elif message.frm.id in (self.bot.id, self.bot.bot_id, 'B00000000'):
             logger.debug('Ignoring message from ourselves')
             return
 

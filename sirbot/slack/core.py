@@ -130,18 +130,10 @@ class SirBotSlack(Plugin):
             logger.debug('Adding events endpoint: %s',
                          self._config['endpoints']['events'])
             if config['id'] != 'B00000000':
-                raw = await self._http_client.get_bot_info(config['id'])
-                self.bot = User(
-                    id_=raw['id'],
-                    raw=raw
-                )
+                self.bot = await self._users.get(config['id'])
             elif self._bot_token:
                 data = await self._http_client.rtm_connect()
-                raw = await self._http_client.get_bot_info(data['self']['id'])
-                self.bot = User(
-                    id_=raw['id'],
-                    raw=raw
-                )
+                self.bot = await self._users.get(data['self']['id'])
             else:
                 self.bot = User(
                     id_=config['id']
