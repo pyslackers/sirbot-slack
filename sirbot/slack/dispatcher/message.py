@@ -3,9 +3,10 @@ import functools
 import inspect
 import logging
 import re
-import sqlite3
 import time
+
 from collections import defaultdict
+from sqlite3 import IntegrityError
 
 from .dispatcher import SlackDispatcher
 from .. import database
@@ -50,17 +51,27 @@ class MessageDispatcher(SlackDispatcher):
         db = facades.get('database')
 
         if not message.frm:  # Message without frm (i.e: slackbot)
+            logger.debug('Ignoring message without frm')
             return
-        # elif message.frm.id == self.bot.id:  # Skip message from self
-        #     await self._save_update_incoming(message, db)
-        #     return
+        elif message.frm.id in (self.bot.id, 'B00000000'):
+            logger.debug('Ignoring message from ourselves')
+            return
 
         if isinstance(self._save, list) and message.subtype in self._save \
                 or self._save is True:
-            await self._save_incoming(message, db)
+            try:
+                await self._save_incoming(message, db)
+            # except sqlite3.IntegrityError:
+            #     logger.debug('Message "%s" already in saved. Aborting',
+            #                  message.timestamp)
+            #     raise
+            except IntegrityError:
+                logger.debug('Message "%s" already saved. Aborting.',
+                             message.timestamp)
+                return
 
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
-                    'channel_leave', 'bot_message', 'message_replied']
+                    'channel_leave', 'message_replied']
 
         if message.subtype in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
@@ -84,24 +95,25 @@ class MessageDispatcher(SlackDispatcher):
         )
         await db.commit()
 
-    async def _save_update_incoming(self, message, db):
-        """
-        Update incoming message in db.
-
-        Used for self message saved on sending
-
-        :param message: incoming message
-        :param db: db facade
-        :return: None
-        """
-        logger.debug('Update self incoming msg to %s at %s',
-                     message.to.id, message.timestamp)
-
-        try:
-            await self._save_incoming(message, db)
-        except sqlite3.IntegrityError:
-            await database.__dict__[db.type].dispatcher.update_raw(db, message)
-            await db.commit()
+    # async def _save_update_incoming(self, message, db):
+    #     """
+    #     Update incoming message in db.
+    #
+    #     Used for self message saved on sending
+    #
+    #     :param message: incoming message
+    #     :param db: db facade
+    #     :return: None
+    #     """
+    #     logger.debug('Update self incoming msg to %s at %s',
+    #                  message.to.id, message.timestamp)
+    #
+    #     try:
+    #         await self._save_incoming(message, db)
+    #     except sqlite3.IntegrityError:
+    #         await database.__dict__[db.type].dispatcher.update_raw(
+    # db, message)
+    #         await db.commit()
 
     def _register(self):
         """
@@ -147,7 +159,7 @@ class MessageDispatcher(SlackDispatcher):
             logger.debug('Located callback for "{}" in "{}", invoking'.format(
                 msg.frm.id, msg.to.id))
             msg.conversation_id = self._callbacks[msg.frm.id][msg.to.id]['id']
-            await self._update_conversation_id(msg, db)
+            # await self._update_conversation_id(msg, db)
             handlers.append((self._callbacks[msg.frm.id][msg.to.id]['func'],
                              'callback'))
             del self._callbacks[msg.frm.id][msg.to.id]
@@ -200,7 +212,7 @@ class MessageDispatcher(SlackDispatcher):
                 'id': conversation_id
             }
 
-    async def _update_conversation_id(self, msg, db):
-        await database.__dict__[db.type].dispatcher.update_conversation_id(
-            db, msg)
-        await db.commit()
+    # async def _update_conversation_id(self, msg, db):
+    #     await database.__dict__[db.type].dispatcher.update_conversation_id(
+    #         db, msg)
+    #     await db.commit()

@@ -80,11 +80,6 @@ class SirBotSlack(Plugin):
         if 'database' not in self._facades:
             raise SlackSetupError('A database facades is required')
 
-        db = self._facades.get('database')
-        if db.type not in SUPPORTED_DATABASE:
-            raise SlackSetupError('Database must be one of %s',
-                                  ', '.join(SUPPORTED_DATABASE))
-
         if not self._bot_token and not self._app_token:
             raise SlackSetupError(
                 'One of SIRBOT_SLACK_BOT_TOKEN or SIRBOT_SLACK_TOKEN'
@@ -124,15 +119,6 @@ class SirBotSlack(Plugin):
         )
 
         if self._bot_token:
-
-            data = await self._http_client.info_self()
-            data['is_bot'] = True
-            self.bot = User(
-                data['id'],
-                raw=data,
-                dm_id=data['id']
-            )
-
             self._rtm_client = RTMClient(
                 bot_token=self._bot_token,
                 loop=self._loop,
@@ -141,6 +127,26 @@ class SirBotSlack(Plugin):
             )
 
         if self._bot_token or self._config['endpoints']['events']:
+            logger.debug('Adding events endpoint: %s',
+                         self._config['endpoints']['events'])
+            if config['id'] != 'B00000000':
+                raw = await self._http_client.get_bot_info(config['id'])
+                self.bot = User(
+                    id_=raw['id'],
+                    raw=raw
+                )
+            elif self._bot_token:
+                data = await self._http_client.rtm_connect()
+                raw = await self._http_client.get_bot_info(data['self']['id'])
+                self.bot = User(
+                    id_=raw['id'],
+                    raw=raw
+                )
+            else:
+                self.bot = User(
+                    id_=config['id']
+                )
+
             self._dispatcher['event'] = EventDispatcher(
                 http_client=self._http_client,
                 users=self._users,
@@ -149,8 +155,17 @@ class SirBotSlack(Plugin):
                 plugins=pm,
                 facades=self._facades,
                 loop=self._loop,
-                save=self._config['save']['events'],
-                bot=self.bot
+                event_save=self._config['save']['events'],
+                msg_save=self._config['save']['messages'],
+                bot=self.bot,
+                token=self._verification_token
+            )
+
+        if self._config['endpoints']['events']:
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['events'],
+                self._dispatcher['event'].incoming_web
             )
 
         if self._config['endpoints']['actions']:
@@ -194,10 +209,6 @@ class SirBotSlack(Plugin):
                 self._dispatcher['command'].incoming
             )
 
-        self._dispatcher['action'].started = True
-        self._dispatcher['command'].started = True
-        self._started = True
-
     def facade(self):
         """
         Initialize and return a new facade
@@ -216,11 +227,17 @@ class SirBotSlack(Plugin):
 
     async def start(self):
         logger.debug('Starting slack plugin')
+
+        db = self._facades.get('database')
+        if db.type not in SUPPORTED_DATABASE:
+            raise SlackSetupError('Database must be one of %s',
+                                  ', '.join(SUPPORTED_DATABASE))
+
         await self._create_db_table()
         if self._rtm_client:
             await self._rtm_client.connect()
         else:
-            self._dispatcher.started = True
+            self._started = True
 
     async def _rtm_reconnect(self):
         logger.warning('Trying to reconnect to slack')
@@ -233,7 +250,9 @@ class SirBotSlack(Plugin):
     async def _incoming_rtm(self, event):
         msg_type = event.get('type', None)
 
-        if self.started or msg_type == 'connected':
+        if msg_type == 'connected':
+            self._started = True
+        elif self.started:
             if msg_type in ('team_migration_started', 'goodbye'):
                 logger.debug('Bot needs to reconnect')
                 await self._rtm_reconnect()

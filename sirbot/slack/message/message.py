@@ -111,11 +111,7 @@ class SlackMessage:
         else:
             bot_id = data.get('bot_id')\
                 or data.get('message', {}).get('bot_id')
-
-            if bot_id == slack.bot.id:
-                frm = slack.bot
-            else:
-                frm = None
+            frm = await slack.users.get(bot_id)
 
         if channel_id.startswith('D'):
             mention = True
@@ -127,7 +123,7 @@ class SlackMessage:
             mention = False
             to = await slack.groups.get(channel_id)
 
-        if slack.bot.id in text:
+        if slack.bot and slack.bot.id in text:
             mention = True
             bot_link = '<@{}>'.format(slack.bot.id)
             if text.startswith(bot_link):

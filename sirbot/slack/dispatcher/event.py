@@ -2,6 +2,9 @@ import logging
 import asyncio
 import inspect
 import time
+import json
+
+from aiohttp.web import Response
 
 from .dispatcher import SlackDispatcher
 from .message import MessageDispatcher
@@ -15,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 class EventDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
-                 save, loop, bot):
-
-        self.bot = bot
+                 event_save, msg_save, loop, bot, token):
 
         super().__init__(
             http_client=http_client,
@@ -26,7 +27,7 @@ class EventDispatcher(SlackDispatcher):
             groups=groups,
             plugins=plugins,
             facades=facades,
-            save=save,
+            save=event_save,
             loop=loop
         )
 
@@ -37,10 +38,12 @@ class EventDispatcher(SlackDispatcher):
             groups=groups,
             plugins=plugins,
             facades=facades,
-            save=save,
+            save=msg_save,
             loop=loop,
             bot=bot
         )
+
+        self._token = token
 
     async def incoming(self, item):
         pass
@@ -56,7 +59,32 @@ class EventDispatcher(SlackDispatcher):
             logger.exception(e)
 
     async def incoming_web(self, request):
-        pass
+        payload = await request.json()
+
+        if payload['token'] != self._token:
+            return Response(text='Invalid')
+
+        if payload['type'] == 'url_verification':
+            body = json.dumps({'challenge': payload['challenge']})
+            return Response(body=body, status=200)
+
+        try:
+            if payload['event']['type'] == 'message':
+                ensure_future(
+                    self._message_dispatcher.incoming(payload['event']),
+                    loop=self._loop,
+                    logger=logger
+                )
+            else:
+                ensure_future(
+                    self._incoming(payload['event']),
+                    loop=self._loop,
+                    logger=logger
+                )
+            return Response(status=200)
+        except Exception as e:
+            logger.exception(e)
+            return Response(status=500)
 
     async def _incoming(self, event):
 

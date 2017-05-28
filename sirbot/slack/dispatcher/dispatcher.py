@@ -13,7 +13,6 @@ class SlackDispatcher:
         if not save:
             save = list()
 
-        self.started = False
         self._loop = loop
         self._facades = facades
         self._save = save
@@ -28,10 +27,6 @@ class SlackDispatcher:
         self._register()
 
     async def incoming(self, item):
-
-        if not self.started:
-            return Response(text='''Not fully started. Please try latter !''')
-
         try:
             rep = await self._incoming(item)
             return rep

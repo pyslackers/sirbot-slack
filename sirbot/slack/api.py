@@ -370,13 +370,19 @@ class HTTPClient(APICaller):
 
         return rep['channel']['id']
 
-    async def get_bot_info(self, bot):
-        rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
-        return rep
+    async def get_bot_info(self, bot=None):
 
-    async def info_self(self):
+        if bot:
+            rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
+        else:
+            rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
+            logger.warning(rep)
+
+        return rep['bot']
+
+    async def rtm_connect(self):
         rep = await self._do_post(APIPath.RTM_CONNECT, token=self._bot_token)
-        return rep['self']
+        return rep
 
 
 class RTMClient(APICaller):
@@ -393,15 +399,8 @@ class RTMClient(APICaller):
 
         super().__init__(bot_token, loop=loop, session=session)
         self._ws = None
-        self._login_data = None
         self._closed = asyncio.Event(loop=self._loop)
         self._callback = callback
-
-    @property
-    def slack_id(self):
-        if self._login_data is None:
-            return None
-        return self._login_data['self']['id']
 
     @property
     def is_closed(self) -> bool:
@@ -412,12 +411,12 @@ class RTMClient(APICaller):
         """
         Get the RTM url
         """
-        self._login_data = await self._do_post(APIPath.RTM_CONNECT)
-        if self._login_data.get('ok') is False:
+        data = await self._do_post(APIPath.RTM_CONNECT)
+        if data.get('ok') is False:
             raise SlackConnectionError(
-                'Error with slack {}'.format(self._login_data))
+                'Error with slack {}'.format(data))
 
-        return self._login_data
+        return data
 
     async def connect(self):
         """
@@ -426,8 +425,6 @@ class RTMClient(APICaller):
         """
         logger.debug('Connecting...')
         try:
-            # TODO: We will need to put in some logic for re-connection
-            #       on error.
             login_data = await self._negotiate_rtm_url()
             login_data['type'] = 'connected'
             await self._callback(login_data)
