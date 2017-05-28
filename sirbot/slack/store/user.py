@@ -29,6 +29,22 @@ class User(SlackItem):
         raise NotImplementedError
 
     @property
+    def bot(self):
+        return self._raw.get('is_bot', False)
+
+    @bot.setter
+    def bot(self, _):
+        raise NotImplementedError
+
+    @property
+    def bot_id(self):
+        return self._raw.get('profile', {}).get('bot_id', '')
+
+    @bot_id.setter
+    def bot_id(self, _):
+        raise NotImplementedError
+
+    @property
     def send_id(self):
         return self.dm_id
 
