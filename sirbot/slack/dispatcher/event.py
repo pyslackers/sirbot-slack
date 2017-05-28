@@ -1,9 +1,14 @@
 import logging
 import asyncio
 import inspect
-import json
 import time
+import json
 
+from aiohttp.web import Response
+
+from .dispatcher import SlackDispatcher
+from .message import MessageDispatcher
+from .. import database
 from collections import defaultdict
 from sirbot.utils import ensure_future
 
@@ -11,42 +16,91 @@ from sirbot.utils import ensure_future
 logger = logging.getLogger(__name__)
 
 
-class SlackEventDispatcher:
-    def __init__(self, pm, save=None, *, loop):
+class EventDispatcher(SlackDispatcher):
+    def __init__(self, http_client, users, channels, groups, plugins, facades,
+                 event_save, msg_save, loop, bot, token):
 
-        if not save:
-            save = list()
+        super().__init__(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=event_save,
+            loop=loop
+        )
 
-        self._loop = loop
-        self._save = save
+        self._message_dispatcher = MessageDispatcher(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=msg_save,
+            loop=loop,
+            bot=bot
+        )
 
-        self.events = defaultdict(list)
+        self._token = token
 
-        self._register(pm)
+    async def incoming(self, item):
+        pass
 
-    async def incoming(self, event_type, event, slack_facade, facades):
-        """
-        Handler for the incoming events which are not of type `message`
+    async def incoming_rtm(self, event):
 
-        Pass the event to the correct functions
+        try:
+            if event['type'] == 'message':
+                await self._message_dispatcher.incoming(event)
+            else:
+                await self._incoming(event)
+        except Exception as e:
+            logger.exception(e)
 
-        :param event: incoming event
-        :param event_type: type of the incoming event
-        :param slack_facade: facade of the slack plugin
-        :param facades: main facade
-        :return: None
-        """
+    async def incoming_web(self, request):
+        payload = await request.json()
 
-        if isinstance(self._save, list) and event_type in self._save \
+        if payload['token'] != self._token:
+            return Response(text='Invalid')
+
+        if payload['type'] == 'url_verification':
+            body = json.dumps({'challenge': payload['challenge']})
+            return Response(body=body, status=200)
+
+        try:
+            if payload['event']['type'] == 'message':
+                ensure_future(
+                    self._message_dispatcher.incoming(payload['event']),
+                    loop=self._loop,
+                    logger=logger
+                )
+            else:
+                ensure_future(
+                    self._incoming(payload['event']),
+                    loop=self._loop,
+                    logger=logger
+                )
+            return Response(status=200)
+        except Exception as e:
+            logger.exception(e)
+            return Response(status=500)
+
+    async def _incoming(self, event):
+
+        facades = self._facades.new()
+        slack = facades.get('slack')
+
+        if isinstance(self._save, list) and event['type'] in self._save \
                 or self._save is True:
             db = facades.get('database')
-            await self._store_incoming(event_type, event, db)
+            await self._store_incoming(event, db)
 
-        for func in self.events.get(event_type, list()):
-            f = func(event, slack_facade, facades)
+        for func in self._endpoints.get(event['type'], list()):
+            f = func(event, slack, facades)
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
-    def _register(self, pm):
+    def _register(self):
         """
         Find and register the functions handling specifics events
 
@@ -55,7 +109,8 @@ class SlackEventDispatcher:
         :param pm: pluggy plugin store
         :return None
         """
-        all_events = pm.hook.register_slack_events()
+        self._endpoints = defaultdict(list)
+        all_events = self._plugins.hook.register_slack_events()
         for events in all_events:
             for event in events:
                 if not asyncio.iscoroutinefunction(event['func']):
@@ -65,9 +120,9 @@ class SlackEventDispatcher:
                              event['event'],
                              event['func'].__name__,
                              inspect.getabsfile(event['func']))
-                self.events[event['event']].append(event['func'])
+                self._endpoints[event['event']].append(event['func'])
 
-    async def _store_incoming(self, event_type, event, db):
+    async def _store_incoming(self, event, db):
         """
         Store incoming event in db
 
@@ -81,10 +136,9 @@ class SlackEventDispatcher:
         if isinstance(user, dict):
             user = user.get('id')
 
-        logger.debug('Saving incoming event %s from %s', event_type, user)
+        logger.debug('Saving incoming event %s from %s', event['type'], user)
+        await database.__dict__[db.type].dispatcher.save_incoming_event(
+            ts=ts, user=user, event=event, db=db
+        )
 
-        await db.execute('''INSERT INTO slack_events (ts, from_id, type, raw)
-                            VALUES (?, ?, ?, ?)''',
-                         (ts, user, event_type, json.dumps(event))
-                         )
         await db.commit()

@@ -1,37 +1,39 @@
-import logging
 import asyncio
-import re
-import inspect
-import json
 import functools
+import inspect
+import logging
+import re
 import time
-import sqlite3
 
 from collections import defaultdict
+from sqlite3 import IntegrityError
 
+from .dispatcher import SlackDispatcher
+from .. import database
 from ..message import SlackMessage
-
 
 logger = logging.getLogger(__name__)
 
 
-class SlackMessageDispatcher:
-    def __init__(self, users, channels, bot, pm, save=None, *, loop):
+class MessageDispatcher(SlackDispatcher):
+    def __init__(self, http_client, users, channels, groups, plugins, facades,
+                 save, loop, bot):
 
-        if not save:
-            save = []
-
-        self.commands = defaultdict(list)
-        self.callbacks = dict()
         self.bot = bot
-        self._users = users
-        self._channels = channels
-        self._loop = loop
-        self._save = save
+        self._callbacks = dict()
 
-        self._register(pm)
+        super().__init__(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=save,
+            loop=loop
+        )
 
-    async def incoming(self, msg, slack_facade, facades):
+    async def incoming(self, msg):
         """
         Handler for the incoming events of type 'message'
 
@@ -43,75 +45,77 @@ class SlackMessageDispatcher:
         """
         logger.debug('Message handler received %s', msg)
 
-        message = await SlackMessage.from_raw(msg, slack_facade)
+        facades = self._facades.new()
+        slack = facades.get('slack')
+        message = await SlackMessage.from_raw(msg, slack)
         db = facades.get('database')
 
         if not message.frm:  # Message without frm (i.e: slackbot)
+            logger.debug('Ignoring message without frm')
             return
-        elif message.frm.id == self.bot.id:  # Skip message from self
-            await self._save_update_incoming(message, db)
+        elif message.frm.id in (self.bot.id, 'B00000000'):
+            logger.debug('Ignoring message from ourselves')
             return
 
-        if isinstance(self._save, list) and message.subtype in self._save\
+        if isinstance(self._save, list) and message.subtype in self._save \
                 or self._save is True:
-            await self._save_incoming(message, db)
+            try:
+                await self._save_incoming(message, db)
+            # except sqlite3.IntegrityError:
+            #     logger.debug('Message "%s" already in saved. Aborting',
+            #                  message.timestamp)
+            #     raise
+            except IntegrityError:
+                logger.debug('Message "%s" already saved. Aborting.',
+                             message.timestamp)
+                return
 
         ignoring = ['message_changed', 'message_deleted', 'channel_join',
-                    'channel_leave', 'bot_message', 'message_replied']
+                    'channel_leave', 'message_replied']
 
         if message.subtype in ignoring:
             logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
-        await self._dispatch(message, slack_facade, facades, db)
+        await self._dispatch(message, slack, facades, db)
 
     async def _save_incoming(self, message, db):
         """
         Save incoming message in db
 
-        :param msg: message
+        :param message: message
         :param db: db facade
         :return: None
         """
         logger.debug('Saving incoming msg from %s to %s at %s',
                      message.frm.id, message.to.id, message.timestamp)
 
-        await db.execute('''INSERT INTO slack_messages
-                          (ts, from_id, to_id, type, conversation, mention,
-                          text, raw)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                          ''',
-                         (message.timestamp, message.frm.id, message.to.id,
-                          message.subtype, message.conversation,
-                          message.mention, message.text,
-                          json.dumps(message.raw))
-                         )
-
+        await database.__dict__[db.type].dispatcher.save_incoming_message(
+            db, message
+        )
         await db.commit()
 
-    async def _save_update_incoming(self, message, db):
-        """
-        Update incoming message in db.
+    # async def _save_update_incoming(self, message, db):
+    #     """
+    #     Update incoming message in db.
+    #
+    #     Used for self message saved on sending
+    #
+    #     :param message: incoming message
+    #     :param db: db facade
+    #     :return: None
+    #     """
+    #     logger.debug('Update self incoming msg to %s at %s',
+    #                  message.to.id, message.timestamp)
+    #
+    #     try:
+    #         await self._save_incoming(message, db)
+    #     except sqlite3.IntegrityError:
+    #         await database.__dict__[db.type].dispatcher.update_raw(
+    # db, message)
+    #         await db.commit()
 
-        Used for self message saved on sending
-
-        :param message: incoming message
-        :param db: db facade
-        :return: None
-        """
-        logger.debug('Update self incoming msg to %s at %s',
-                     message.to.id, message.timestamp)
-
-        try:
-            await self._save_incoming(message, db)
-        except sqlite3.IntegrityError:
-            await db.execute('''UPDATE slack_messages SET raw=?
-                                WHERE ts=?''',
-                             (json.dumps(message.raw), message.timestamp)
-                             )
-            await db.commit()
-
-    def _register(self, pm):
+    def _register(self):
         """
         Find and register the functions handling specifics messages
 
@@ -119,7 +123,8 @@ class SlackMessageDispatcher:
 
         :param pm: pluggy plugin store
         """
-        all_messages = pm.hook.register_slack_messages()
+        self._endpoints = defaultdict(list)
+        all_messages = self._plugins.hook.register_slack_messages()
         for messages in all_messages:
             for msg in messages:
                 if not asyncio.iscoroutinefunction(msg['func']):
@@ -129,10 +134,12 @@ class SlackMessageDispatcher:
                              msg['match'],
                              msg['func'].__name__,
                              inspect.getabsfile(msg['func']))
-                msg['match'] = msg['match'].format(
-                    bot_name='<@{}>'.format(self.bot.id))
-                self.commands[re.compile(msg['match'],
-                                         msg.get('flags', 0))].append(msg)
+
+                if self.bot:
+                    msg['match'] = msg['match'].format(
+                        bot_name='<@{}>'.format(self.bot.id))
+                self._endpoints[re.compile(msg['match'],
+                                           msg.get('flags', 0))].append(msg)
 
     async def _dispatch(self, msg, slack_facade, facades, db):
         """
@@ -145,19 +152,19 @@ class SlackMessageDispatcher:
         """
         handlers = list()
 
-        if msg.frm.id in self.callbacks \
-                and msg.to.id in self.callbacks[msg.frm.id] \
-                and time.time() < self.callbacks[msg.frm.id][msg.to.id][
-                    'time'] + self.callbacks[msg.frm.id][msg.to.id]['timeout']:
+        if msg.frm.id in self._callbacks and msg.to.id in self._callbacks[
+            msg.frm.id] and time.time() < \
+                self._callbacks[msg.frm.id][msg.to.id]['time'] + \
+                self._callbacks[msg.frm.id][msg.to.id]['timeout']:
             logger.debug('Located callback for "{}" in "{}", invoking'.format(
                 msg.frm.id, msg.to.id))
-            msg.conversation_id = self.callbacks[msg.frm.id][msg.to.id]['id']
-            await self._update_conversation_id(msg, db)
-            handlers.append((self.callbacks[msg.frm.id][msg.to.id]['func'],
+            msg.conversation_id = self._callbacks[msg.frm.id][msg.to.id]['id']
+            # await self._update_conversation_id(msg, db)
+            handlers.append((self._callbacks[msg.frm.id][msg.to.id]['func'],
                              'callback'))
-            del self.callbacks[msg.frm.id][msg.to.id]
+            del self._callbacks[msg.frm.id][msg.to.id]
         else:
-            for match, commands in self.commands.items():
+            for match, commands in self._endpoints.items():
                 n = match.search(msg.text)
                 if n:
                     for command in commands:
@@ -196,18 +203,16 @@ class SlackMessageDispatcher:
             timeout = result.get('timeout', 300)
             conversation_id = msg.conversation_id or msg.timestamp
 
-            if frm.id not in self.callbacks:
-                self.callbacks[frm.id] = dict()
-            self.callbacks[frm.id][to.id] = {
+            if frm.id not in self._callbacks:
+                self._callbacks[frm.id] = dict()
+            self._callbacks[frm.id][to.id] = {
                 'func': callback,
                 'time': time.time(),
                 'timeout': timeout,
                 'id': conversation_id
             }
 
-    async def _update_conversation_id(self, msg, db):
-        await db.execute('''UPDATE slack_messages SET conversation=?
-                             WHERE ts=?'''
-                         , (msg.conversation, msg.timestamp)
-                         )
-        await db.commit()
+    # async def _update_conversation_id(self, msg, db):
+    #     await database.__dict__[db.type].dispatcher.update_conversation_id(
+    #         db, msg)
+    #     await db.commit()

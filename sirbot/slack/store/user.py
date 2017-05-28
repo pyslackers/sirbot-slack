@@ -29,22 +29,6 @@ class User(SlackItem):
         raise NotImplementedError
 
     @property
-    def bot(self):
-        return self._raw.get('is_bot', False)
-
-    @bot.setter
-    def bot(self, _):
-        raise NotImplementedError
-
-    @property
-    def bot_id(self):
-        return self._raw.get('profile', {}).get('bot_id', '')
-
-    @bot_id.setter
-    def bot_id(self, _):
-        raise NotImplementedError
-
-    @property
     def send_id(self):
         return self.dm_id
 
@@ -137,7 +121,11 @@ class UserStore(SlackStore):
         await db.commit()
 
     async def _query(self, id_, dm_id=None):
-        raw = await self._client.get_user_info(id_)
+
+        if id_.startswith('B'):
+            raw = await self._client.get_bot_info(id_)
+        else:
+            raw = await self._client.get_user_info(id_)
         user = User(
             id_=id_,
             raw=raw,

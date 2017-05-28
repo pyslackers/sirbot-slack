@@ -1,3 +1,5 @@
 # flake8: noqa
 
-from .main import SlackMainDispatcher
+from .action import ActionDispatcher
+from .command import CommandDispatcher
+from .event import EventDispatcher

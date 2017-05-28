@@ -5,23 +5,25 @@ import os
 import pluggy
 import yaml
 
-from aiohttp.web import Response
 from sirbot.utils import merge_dict
 from sirbot.core import Plugin
 
 from . import hookspecs, database
-from .dispatcher import SlackMainDispatcher
+from .dispatcher import EventDispatcher, ActionDispatcher, CommandDispatcher
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
 from .errors import SlackClientError, SlackSetupError
 from .facade import SlackFacade
 from .store import ChannelStore, UserStore, GroupStore
+from .store.user import User
 
 logger = logging.getLogger(__name__)
 
 MANDATORY_PLUGIN = ['sirbot.slack.store.user',
                     'sirbot.slack.store.channel',
                     'sirbot.slack.store.group']
+
+SUPPORTED_DATABASE = ['sqlite']
 
 
 class SirBotSlack(Plugin):
@@ -45,13 +47,14 @@ class SirBotSlack(Plugin):
         self._users = None
         self._channels = None
         self._groups = None
-        self._dispatcher = None
+        self._started = False
+        self._dispatcher = dict()
+
+        self.bot = None
 
     @property
     def started(self):
-        if self._dispatcher:
-            return self._dispatcher.started
-        return False
+        return self._started
 
     async def configure(self, config, router, session, facades):
         logger.debug('Configuring slack plugin')
@@ -67,24 +70,6 @@ class SirBotSlack(Plugin):
         self._router = router
         self._session = session
         self._facades = facades
-
-        if self._config['endpoints']['commands']:
-            logger.debug('Adding commands endpoint: %s',
-                         self._config['endpoints']['commands'])
-            self._router.add_route(
-                'POST',
-                self._config['endpoints']['commands'],
-                self._incoming_command
-            )
-
-        if self._config['endpoints']['actions']:
-            logger.debug('Adding actions endpoint: %s',
-                         self._config['endpoints']['actions'])
-            self._router.add_route(
-                'POST',
-                self._config['endpoints']['actions'],
-                self._incoming_button
-            )
 
         self._bot_token = os.environ.get('SIRBOT_SLACK_BOT_TOKEN', '')
         self._app_token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
@@ -115,18 +100,6 @@ class SirBotSlack(Plugin):
             session=self._session
         )
 
-        if self._bot_token:
-            self._rtm_client = RTMClient(
-                bot_token=self._bot_token,
-                loop=self._loop,
-                callback=self._incoming_rtm,
-                session=self._session
-            )
-        else:
-            logger.info(
-                'No bot token. Sir-bot-a-lot will not connect to the RTM API'
-            )
-
         self._users = UserStore(
             client=self._http_client,
             facades=self._facades,
@@ -145,16 +118,96 @@ class SirBotSlack(Plugin):
             refresh=self._config['refresh']['group']
         )
 
-        self._dispatcher = SlackMainDispatcher(
-            http_client=self._http_client,
-            users=self._users,
-            channels=self._channels,
-            pm=pm,
-            facades=facades,
-            loop=self._loop,
-            config=self._config,
-            verification=self._verification_token
-        )
+        if self._bot_token:
+            self._rtm_client = RTMClient(
+                bot_token=self._bot_token,
+                loop=self._loop,
+                callback=self._incoming_rtm,
+                session=self._session
+            )
+
+        if self._bot_token or self._config['endpoints']['events']:
+            logger.debug('Adding events endpoint: %s',
+                         self._config['endpoints']['events'])
+            if config['id'] != 'B00000000':
+                raw = await self._http_client.get_bot_info(config['id'])
+                self.bot = User(
+                    id_=raw['id'],
+                    raw=raw
+                )
+            elif self._bot_token:
+                data = await self._http_client.rtm_connect()
+                raw = await self._http_client.get_bot_info(data['self']['id'])
+                self.bot = User(
+                    id_=raw['id'],
+                    raw=raw
+                )
+            else:
+                self.bot = User(
+                    id_=config['id']
+                )
+
+            self._dispatcher['event'] = EventDispatcher(
+                http_client=self._http_client,
+                users=self._users,
+                channels=self._channels,
+                groups=self._groups,
+                plugins=pm,
+                facades=self._facades,
+                loop=self._loop,
+                event_save=self._config['save']['events'],
+                msg_save=self._config['save']['messages'],
+                bot=self.bot,
+                token=self._verification_token
+            )
+
+        if self._config['endpoints']['events']:
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['events'],
+                self._dispatcher['event'].incoming_web
+            )
+
+        if self._config['endpoints']['actions']:
+            logger.debug('Adding actions endpoint: %s',
+                         self._config['endpoints']['actions'])
+            self._dispatcher['action'] = ActionDispatcher(
+                http_client=self._http_client,
+                users=self._users,
+                channels=self._channels,
+                groups=self._groups,
+                plugins=pm,
+                facades=self._facades,
+                loop=self._loop,
+                save=self._config['save']['actions'],
+                token=self._verification_token
+            )
+
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['actions'],
+                self._dispatcher['action'].incoming
+            )
+
+        if self._config['endpoints']['commands']:
+            logger.debug('Adding commands endpoint: %s',
+                         self._config['endpoints']['commands'])
+            self._dispatcher['command'] = CommandDispatcher(
+                http_client=self._http_client,
+                users=self._users,
+                channels=self._channels,
+                groups=self._groups,
+                plugins=pm,
+                facades=self._facades,
+                loop=self._loop,
+                save=self._config['save']['commands'],
+                token=self._verification_token
+            )
+            self._router.add_route(
+                'POST',
+                self._config['endpoints']['commands'],
+                self._dispatcher['command'].incoming
+            )
 
     def facade(self):
         """
@@ -168,17 +221,23 @@ class SirBotSlack(Plugin):
             users=self._users,
             channels=self._channels,
             groups=self._groups,
-            bot=self._dispatcher.bot,
+            bot=self.bot,
             facades=self._facades
         )
 
     async def start(self):
         logger.debug('Starting slack plugin')
+
+        db = self._facades.get('database')
+        if db.type not in SUPPORTED_DATABASE:
+            raise SlackSetupError('Database must be one of %s',
+                                  ', '.join(SUPPORTED_DATABASE))
+
         await self._create_db_table()
         if self._rtm_client:
             await self._rtm_client.connect()
         else:
-            self._dispatcher.started = True
+            self._started = True
 
     async def _rtm_reconnect(self):
         logger.warning('Trying to reconnect to slack')
@@ -188,32 +247,17 @@ class SirBotSlack(Plugin):
             await asyncio.sleep(1, loop=self._loop)
             await self._rtm_reconnect()
 
-    async def _incoming_rtm(self, msg):
-        msg_type = msg.get('type', None)
+    async def _incoming_rtm(self, event):
+        msg_type = event.get('type', None)
 
-        if self.started or msg_type == 'connected':
+        if msg_type == 'connected':
+            self._started = True
+        elif self.started:
             if msg_type in ('team_migration_started', 'goodbye'):
                 logger.debug('Bot needs to reconnect')
                 await self._rtm_reconnect()
             else:
-                await self._dispatcher.incoming_rtm(msg, msg_type)
-
-    async def _incoming_command(self, request):
-        if self.started:
-            return await self._dispatcher.incoming_command(request)
-        else:
-            return Response(
-                text='''Not fully started. Please try latter !'''
-            )
-
-    async def _incoming_button(self, request):
-
-        if self.started:
-            return await self._dispatcher.incoming_button(request)
-        else:
-            return Response(
-                text='''Not fully started. Please try latter !'''
-            )
+                await self._dispatcher['event'].incoming_rtm(event)
 
     def _initialize_plugins(self):
         """

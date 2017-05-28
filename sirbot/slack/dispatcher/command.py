@@ -6,77 +6,71 @@ import logging
 from aiohttp.web import Response
 from sirbot.utils import ensure_future
 
+from .dispatcher import SlackDispatcher
+from .. import database
+from ..errors import SlackUnknownCommand
 from ..message.command import SlackCommand
 
 logger = logging.getLogger(__name__)
 
 
-class SlackCommandDispatcher:
-    def __init__(self, users, channels, pm, save, loop):
+class CommandDispatcher(SlackDispatcher):
+    def __init__(self, http_client, users, channels, groups, plugins, facades,
+                 save, loop, token):
 
-        if not save:
-            save = list()
+        super().__init__(
+            http_client=http_client,
+            users=users,
+            channels=channels,
+            groups=groups,
+            plugins=plugins,
+            facades=facades,
+            save=save,
+            loop=loop
+        )
 
-        self._users = users
-        self._channels = channels
-        self._pm = pm
-        self._save = save
-        self._loop = loop
+        self._token = token
 
-        self.commands = dict()
-
-        self._register(pm)
-
-    async def incoming(self, data, slack, facades):
-        logger.debug('Command handler received %s', data)
-
-        command_settings = self.commands.get(data['command'])
+    async def _incoming(self, request):
+        data = await request.post()
         data = {**data}
 
-        if not command_settings:
-            logger.warning('Incoming slash command (%s) with no handler',
-                           data['command'])
-            return
+        if data['token'] != self._token:
+            return Response(text='Invalid')
 
-        command = await SlackCommand.from_raw(
-            data,
-            slack,
-            settings=command_settings
-        )
+        logger.debug('Command handler received: %s', data['command'])
+
+        facades = self._facades.new()
+        slack = facades.get('slack')
+        settings = self._endpoints.get(data['command'])
+
+        if not settings:
+            raise SlackUnknownCommand(data['command'])
+
+        command = await SlackCommand.from_raw(data, slack, settings=settings)
 
         if isinstance(self._save, list) and data['command'] in self._save \
                 or self._save is True:
+            logger.debug('Saving incoming command %s from %s',
+                         command.command, command.frm.id)
             db = facades.get('database')
-            await self._save_incoming(command, db)
+            await database.__dict__[db.type].dispatcher.save_incoming_command(
+                db, command)
+            await db.commit()
 
-        couroutine = command_settings['func'](command, slack, facades)
-        ensure_future(coroutine=couroutine, loop=self._loop, logger=logger)
+        coroutine = settings['func'](command, slack, facades)
+        ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
-        if command_settings.get('public'):
-            data = {"response_type": "in_channel"}
+        if settings.get('public'):
             return Response(
                 status=200,
-                body=json.dumps(data),
+                body=json.dumps({"response_type": "in_channel"}),
                 content_type='application/json; charset=utf-8'
             )
         else:
             return Response(status=200)
 
-    async def _save_incoming(self, command, db):
-        logger.debug('Saving incoming command %s from %s',
-                     command.command, command.frm.id)
-
-        await db.execute('''INSERT INTO slack_commands
-                            (ts, to_id, from_id, command, text, raw) VALUES
-                            (? ,?, ?, ?, ?, ?)''',
-                         (command.timestamp, command.to.id,
-                          command.frm.id, command.command, command.text,
-                          json.dumps(command.raw))
-                         )
-
-        await db.commit()
-
-    def _register(self, pm):
+    def _register(self):
         """
         Find and register the functions handling specifics events
 
@@ -85,7 +79,7 @@ class SlackCommandDispatcher:
         :param pm: pluggy plugin store
         :return None
         """
-        all_commands = pm.hook.register_slack_commands()
+        all_commands = self._plugins.hook.register_slack_commands()
         for commands in all_commands:
             for command in commands:
                 if not asyncio.iscoroutinefunction(command['func']):
@@ -95,4 +89,4 @@ class SlackCommandDispatcher:
                              command['command'],
                              command['func'].__name__,
                              inspect.getabsfile(command['func']))
-                self.commands[command['command']] = command
+                self._endpoints[command['command']] = command
