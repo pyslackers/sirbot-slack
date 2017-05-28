@@ -1,4 +1,4 @@
-async def update_005(db):
+async def update_006(db):
     await db.execute('''ALTER TABLE slack_commands
                         RENAME TO slack_commands_tmp''')
 
@@ -39,3 +39,28 @@ async def update_005(db):
                         FROM slack_actions_tmp''')
 
     await db.execute('''DROP TABLE slack_actions_tmp''')
+
+async def update_007(db):
+
+    await db.execute('''ALTER TABLE slack_messages 
+                        RENAME TO slack_messages_tmp''')
+
+    await db.execute('''CREATE TABLE IF NOT EXISTS slack_messages (
+    ts REAL,
+    from_id TEXT,
+    to_id TEXT,
+    type TEXT,
+    thread REAL,
+    mention BOOLEAN,
+    text TEXT,
+    raw TEXT,
+    PRIMARY KEY (ts, from_id, type)
+    )
+    ''')
+
+    await db.execute('''INSERT INTO slack_messages 
+                        (ts, from_id, to_id, type, mention, text, raw)
+                        SELECT ts, from_id, to_id, type, mention, text, raw
+                        FROM slack_messages_tmp''')
+
+    await db.execute('''DROP TABLE slack_messages_tmp''')

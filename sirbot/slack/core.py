@@ -274,8 +274,12 @@ class SirBotSlack(Plugin):
     async def database_update(self, metadata, db):
 
         if metadata['version'] == '0.0.5':
-            await database.__dict__[db.type].update.update_005(db)
+            await database.__dict__[db.type].update.update_006(db)
             metadata['version'] = '0.0.6'
+
+        if metadata['version'] == '0.0.6':
+            await database.__dict__[db.type].update.update_007(db)
+            metadata['version'] = '0.0.7'
 
         return self.__version__
 

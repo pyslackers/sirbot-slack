@@ -9,16 +9,17 @@ logger = logging.getLogger('sirbot.slack')
 
 class SlackMessage:
     def __init__(self, to, frm=None, mention=False, text='', subtype='message',
-                 conversation=None, content=None, timestamp=None, raw=None,
-                 response_url=None, response_type='in_channel',
-                 replace_original=True):
+                 content=None, timestamp=None, raw=None, response_url=None,
+                 response_type='in_channel', replace_original=True):
+
+        if not raw:
+            raw = dict()
 
         self.to = to
         self.frm = frm
         self.mention = mention
         self.subtype = subtype
         self.timestamp = timestamp
-        self.conversation = conversation
         self.raw = raw
         self.response_type = response_type
         self.replace_original = replace_original
@@ -43,6 +44,14 @@ class SlackMessage:
     def attachments(self, attachments):
         self.content.attachments = attachments
 
+    @property
+    def thread(self):
+        return self.raw.get('thread_ts', '')
+
+    @thread.setter
+    def thread(self, _):
+        raise ValueError
+
     def serialize(self, type_='send'):
 
         if type_ == 'response':
@@ -57,23 +66,31 @@ class SlackMessage:
         if self.timestamp:
             data['ts'] = self.timestamp
 
+        if self.thread:
+            data['thread_ts'] = self.thread
+
         return data
 
-    def response(self):
+    def response(self, thread=True):
+
+        if thread and not self.thread:
+            raw = {'thread_ts': self.timestamp}
+        else:
+            raw = {'thread_ts': self.thread}
 
         if isinstance(self.to, User):
             rep = SlackMessage(
                 to=self.frm,
                 mention=False,
-                conversation=self.conversation,
-                response_type=self.response_type
+                response_type=self.response_type,
+                raw=raw
             )
         else:
             rep = SlackMessage(
                 to=self.to,
                 mention=False,
-                conversation=self.conversation,
-                response_type=self.response_type
+                response_type=self.response_type,
+                raw=raw
             )
 
         return rep
@@ -88,7 +105,6 @@ class SlackMessage:
             frm=self.frm,
             mention=self.mention,
             subtype=self.subtype,
-            conversation=self.conversation,
             response_type=self.response_type,
             replace_original=self.replace_original
         )
@@ -139,7 +155,6 @@ class SlackMessage:
             frm=frm,
             text=text,
             subtype=subtype,
-            conversation=timestamp,
             timestamp=timestamp,
             content=content,
             raw=data,

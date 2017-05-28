@@ -20,7 +20,7 @@ class MessageDispatcher(SlackDispatcher):
                  save, loop, bot):
 
         self.bot = bot
-        self._callbacks = dict()
+        self._threads = dict()
 
         super().__init__(
             http_client=http_client,
@@ -61,10 +61,6 @@ class MessageDispatcher(SlackDispatcher):
                 or self._save is True:
             try:
                 await self._save_incoming(message, db)
-            # except sqlite3.IntegrityError:
-            #     logger.debug('Message "%s" already in saved. Aborting',
-            #                  message.timestamp)
-            #     raise
             except IntegrityError:
                 logger.debug('Message "%s" already saved. Aborting.',
                              message.timestamp)
@@ -94,26 +90,6 @@ class MessageDispatcher(SlackDispatcher):
             db, message
         )
         await db.commit()
-
-    # async def _save_update_incoming(self, message, db):
-    #     """
-    #     Update incoming message in db.
-    #
-    #     Used for self message saved on sending
-    #
-    #     :param message: incoming message
-    #     :param db: db facade
-    #     :return: None
-    #     """
-    #     logger.debug('Update self incoming msg to %s at %s',
-    #                  message.to.id, message.timestamp)
-    #
-    #     try:
-    #         await self._save_incoming(message, db)
-    #     except sqlite3.IntegrityError:
-    #         await database.__dict__[db.type].dispatcher.update_raw(
-    # db, message)
-    #         await db.commit()
 
     def _register(self):
         """
@@ -152,17 +128,12 @@ class MessageDispatcher(SlackDispatcher):
         """
         handlers = list()
 
-        if msg.frm.id in self._callbacks and msg.to.id in self._callbacks[
-            msg.frm.id] and time.time() < \
-                self._callbacks[msg.frm.id][msg.to.id]['time'] + \
-                self._callbacks[msg.frm.id][msg.to.id]['timeout']:
-            logger.debug('Located callback for "{}" in "{}", invoking'.format(
-                msg.frm.id, msg.to.id))
-            msg.conversation_id = self._callbacks[msg.frm.id][msg.to.id]['id']
-            # await self._update_conversation_id(msg, db)
-            handlers.append((self._callbacks[msg.frm.id][msg.to.id]['func'],
-                             'callback'))
-            del self._callbacks[msg.frm.id][msg.to.id]
+        logger.warning(self._threads)
+        logger.warning(msg.thread)
+        if msg.thread in self._threads:
+            logger.debug('Located thread handler for "%s"', msg.thread)
+            handlers.append((self._threads[msg.thread], ''))
+            del self._threads[msg.thread]
         else:
             for match, commands in self._endpoints.items():
                 n = match.search(msg.text)
@@ -196,23 +167,8 @@ class MessageDispatcher(SlackDispatcher):
             logger.exception(e)
             raise
 
-        if result and 'func' in result:
-            to = result.get('to', msg.to)
-            frm = result.get('frm', msg.frm)
-            callback = result['func']
-            timeout = result.get('timeout', 300)
-            conversation_id = msg.conversation_id or msg.timestamp
-
-            if frm.id not in self._callbacks:
-                self._callbacks[frm.id] = dict()
-            self._callbacks[frm.id][to.id] = {
-                'func': callback,
-                'time': time.time(),
-                'timeout': timeout,
-                'id': conversation_id
-            }
-
-    # async def _update_conversation_id(self, msg, db):
-    #     await database.__dict__[db.type].dispatcher.update_conversation_id(
-    #         db, msg)
-    #     await db.commit()
+        if result:
+            thread = msg.thread or msg.timestamp
+            callback = result
+            logger.debug('Adding thread "%s" handler', thread)
+            self._threads[thread] = callback

@@ -1,7 +1,5 @@
-import json
 import logging
 
-from .message.message import SlackMessage
 from .store.user import User
 
 logger = logging.getLogger(__name__)
@@ -130,63 +128,3 @@ class SlackFacade:
 
         message.reactions = reactions
         return reactions
-
-    async def conversation(self, msg, limit=0):
-        query = '''SELECT raw FROM slack_messages
-                             WHERE conversation_id=? AND ts <= ?
-                             ORDER BY ts DESC'''
-
-        db = self._facades.get('database')
-
-        if limit:
-            query += ' LIMIT ?'
-            await db.execute(query,
-                             (msg.conversation_id, msg.timestamp, limit))
-        else:
-            await db.execute(query, (msg.conversation_id, msg.timestamp))
-
-        raw_msgs = await db.fetchall()
-        messages = list()
-        for message in raw_msgs:
-            m = await SlackMessage.from_raw(
-                json.loads(message['raw']),
-                slack=self
-            )
-            messages.append(m)
-        return messages
-
-    # async def _save_outgoing_message(self, message):
-    #     """
-    #     Store outgoing message in db
-    #
-    #     :param msg: message
-    #     :param db: db facade
-    #     :return: None
-    #     """
-    #     message.timestamp = message.raw.get('ts')
-    #
-    #     logger.debug('Saving outgoing msg to %s at %s',
-    #                  message.to.id, message.timestamp)
-    #
-    #     if not message.conversation:
-    #         message.conversation = message.timestamp
-    #
-    #     db = self._facades.get('database')
-    #     try:
-    #         await db.execute('''INSERT INTO slack_messages
-    #                           (ts, from_id, to_id,
-        # type, conversation, mention,
-    #                           text, raw)
-    #                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    #                           ''',
-    #                          (message.timestamp,
-        #  message.frm.id, message.to.id,
-    #                           message.subtype, message.conversation, False,
-    #                           message.text, json.dumps(message.raw))
-    #                          )
-    #     except sqlite3.IntegrityError:
-    #         await db.execute('''UPDATE slack_messages SET conversation=?
-    #                             WHERE ts=?''',
-    #                          (message.conversation, message.timestamp))
-    #
-    #     await db.commit()
