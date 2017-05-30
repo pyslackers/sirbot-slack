@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class EventDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
-                 event_save, msg_save, loop, bot, token):
+                 event_save, message_dispatcher, loop, token):
 
         super().__init__(
             http_client=http_client,
@@ -31,19 +31,9 @@ class EventDispatcher(SlackDispatcher):
             loop=loop
         )
 
-        self._message_dispatcher = MessageDispatcher(
-            http_client=http_client,
-            users=users,
-            channels=channels,
-            groups=groups,
-            plugins=plugins,
-            facades=facades,
-            save=msg_save,
-            loop=loop,
-            bot=bot
-        )
-
+        self._message_dispatcher = message_dispatcher
         self._token = token
+        self.bot = None
 
     async def incoming(self, item):
         pass

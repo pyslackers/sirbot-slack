@@ -3,7 +3,6 @@ import functools
 import inspect
 import logging
 import re
-import time
 
 from collections import defaultdict
 from sqlite3 import IntegrityError
@@ -14,13 +13,13 @@ from ..message import SlackMessage
 
 logger = logging.getLogger(__name__)
 
+IGNORING = ['message_changed', 'message_deleted', 'channel_join',
+            'channel_leave', 'message_replied']
+
 
 class MessageDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
-                 save, loop, bot):
-
-        self.bot = bot
-        self._threads = dict()
+                 save, loop):
 
         super().__init__(
             http_client=http_client,
@@ -32,6 +31,9 @@ class MessageDispatcher(SlackDispatcher):
             save=save,
             loop=loop
         )
+
+        self.bot = None
+        self._threads = dict()
 
     async def incoming(self, msg):
         """
@@ -53,8 +55,8 @@ class MessageDispatcher(SlackDispatcher):
         if not message.frm:  # Message without frm (i.e: slackbot)
             logger.debug('Ignoring message without frm')
             return
-        elif message.frm.id in (self.bot.id, self.bot.bot_id, 'B00000000'):
-            logger.debug('Ignoring message from ourselves')
+        elif message.subtype in IGNORING:
+            logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
         if isinstance(self._save, list) and message.subtype in self._save \
@@ -66,11 +68,8 @@ class MessageDispatcher(SlackDispatcher):
                              message.timestamp)
                 return
 
-        ignoring = ['message_changed', 'message_deleted', 'channel_join',
-                    'channel_leave', 'message_replied']
-
-        if message.subtype in ignoring:
-            logger.debug('Ignoring %s subtype', msg.get('subtype'))
+        if message.frm.id in (self.bot.id, self.bot.bot_id):
+            logger.debug('Ignoring message from ourselves')
             return
 
         await self._dispatch(message, slack, facades, db)
@@ -110,10 +109,6 @@ class MessageDispatcher(SlackDispatcher):
                              msg['match'],
                              msg['func'].__name__,
                              inspect.getabsfile(msg['func']))
-
-                if self.bot:
-                    msg['match'] = msg['match'].format(
-                        bot_name='<@{}>'.format(self.bot.id))
                 self._endpoints[re.compile(msg['match'],
                                            msg.get('flags', 0))].append(msg)
 
@@ -128,8 +123,6 @@ class MessageDispatcher(SlackDispatcher):
         """
         handlers = list()
 
-        logger.warning(self._threads)
-        logger.warning(msg.thread)
         if msg.thread in self._threads:
             logger.debug('Located thread handler for "%s"', msg.thread)
             handlers.append((self._threads[msg.thread], ''))

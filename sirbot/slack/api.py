@@ -384,6 +384,10 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.RTM_CONNECT, token=self._bot_token)
         return rep
 
+    async def auth_test(self):
+        rep = await self._do_post(APIPath.AUTH_TEST)
+        return rep
+
 
 class RTMClient(APICaller):
     """
@@ -418,17 +422,16 @@ class RTMClient(APICaller):
 
         return data
 
-    async def connect(self):
+    async def connect(self, url=None):
         """
         Connect to the websocket stream and iterate over the messages
         dumping them in the Queue.
         """
         logger.debug('Connecting...')
         try:
-            login_data = await self._negotiate_rtm_url()
-            login_data['type'] = 'connected'
-            await self._callback(login_data)
-            async with self._session.ws_connect(login_data['url']) as ws:
+            if not url:
+                url = (await self._negotiate_rtm_url())['url']
+            async with self._session.ws_connect(url) as ws:
                 async for data in ws:
                     if data.type == aiohttp.WSMsgType.TEXT:
                         if data.data == 'close cmd':

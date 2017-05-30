@@ -2,7 +2,6 @@ import json
 import logging
 
 from ..errors import SlackMessageError
-from ..store.user import User
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -46,7 +45,7 @@ class SlackMessage:
 
     @property
     def thread(self):
-        return self.raw.get('thread_ts', '')
+        return self.raw.get('thread_ts', self.timestamp)
 
     @thread.setter
     def thread(self, _):
@@ -66,19 +65,15 @@ class SlackMessage:
         if self.timestamp:
             data['ts'] = self.timestamp
 
-        if self.thread:
+        if self.thread != self.timestamp:
             data['thread_ts'] = self.thread
 
         return data
 
     def response(self, thread=True):
 
-        if thread and not self.thread:
-            raw = {'thread_ts': self.timestamp}
-        else:
-            raw = {'thread_ts': self.thread}
-
-        if isinstance(self.to, User):
+        raw = {'thread_ts': self.thread}
+        if self.to.id.startswith('U'):
             rep = SlackMessage(
                 to=self.frm,
                 mention=False,

@@ -13,10 +13,13 @@ class SlackFacade:
     allow cross service messages
     """
 
-    def __init__(self, http_client, users, channels, groups, bot, facades):
+    def __init__(self, http_client, users, channels, groups, messages,
+                 bot, facades):
+
         self._facades = facades
         self._http_client = http_client
 
+        self.messages = messages
         self.users = users
         self.channels = channels
         self.groups = groups
@@ -128,3 +131,13 @@ class SlackFacade:
 
         message.reactions = reactions
         return reactions
+
+    async def thread_history(self, message):
+        """
+        List the previous message in the thread
+        
+        
+        
+        :param message: 
+        :return: 
+        """
