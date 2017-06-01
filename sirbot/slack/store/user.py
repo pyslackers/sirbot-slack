@@ -70,7 +70,7 @@ class UserStore(SlackStore):
             ) for raw_data in data
         ]
 
-    async def get(self, id_, update=False, dm=False):
+    async def get(self, id_, fetch=False, dm=False):
         """
         Return an User from the User Manager
 
@@ -85,7 +85,7 @@ class UserStore(SlackStore):
         data = await database.__dict__[db.type].user.find(db, id_)
 
         if data and (
-                update or data['last_update'] < time.time() - self._refresh
+                fetch or data['last_update'] < time.time() - self._refresh
         ):
             user = await self._query(id_, data['dm_id'])
 
@@ -167,7 +167,7 @@ async def user_typing(event, slack, _):
     """
     Use the user typing event to make sure the user is in cache
     """
-    await slack.users.get(event['user'], update=False)
+    await slack.users.get(event['user'])
 
 
 async def team_join(event, slack, _):

@@ -128,13 +128,3 @@ class SlackFacade:
 
         message.reactions = reactions
         return reactions
-
-    async def thread_history(self, message):
-        """
-        List the previous message in the thread
-        
-        
-        
-        :param message: 
-        :return: 
-        """
