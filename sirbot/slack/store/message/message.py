@@ -1,6 +1,6 @@
 import json
 import logging
-
+import asyncio
 
 from ..user import User
 from ...errors import SlackMessageError
@@ -10,7 +10,7 @@ logger = logging.getLogger('sirbot.slack')
 
 class SlackMessage:
     def __init__(self, to, frm=None, mention=False, text='', subtype='message',
-                 content=None, timestamp=None, raw=None, response_url=None,
+                 content=None, raw=None, response_url=None,
                  response_type='in_channel', replace_original=True):
 
         if not raw:
@@ -20,7 +20,6 @@ class SlackMessage:
         self.frm = frm
         self.mention = mention
         self.subtype = subtype
-        self.timestamp = timestamp
         self.raw = raw
         self.response_type = response_type
         self.replace_original = replace_original
@@ -29,6 +28,8 @@ class SlackMessage:
         self.content.text = text
         self.response_url = response_url
 
+        self._thread_callback = None
+
     @property
     def text(self):
         return self.content.text
@@ -36,6 +37,14 @@ class SlackMessage:
     @text.setter
     def text(self, text):
         self.content.text = text
+
+    @property
+    def timestamp(self):
+        return self.raw.get('ts') or self.raw.get('message', {}).get('ts')
+
+    @timestamp.setter
+    def timestamp(self, _):
+        raise ValueError
 
     @property
     def attachments(self):
@@ -52,6 +61,23 @@ class SlackMessage:
     @thread.setter
     def thread(self, _):
         raise ValueError
+
+    @property
+    def thread_callback(self):
+        return self._thread_callback
+
+    @thread_callback.setter
+    def thread_callback(self, func):
+
+        if isinstance(func, tuple):
+            func, user_id = func
+        else:
+            user_id = True
+
+        if not asyncio.iscoroutine(func):
+            func = asyncio.coroutine(func)
+
+        self._thread_callback = (func, user_id)
 
     def serialize(self, type_='send', to='rtm'):
 
@@ -120,11 +146,8 @@ class SlackMessage:
         user_id = data.get('user') or data.get('message', {}).get('user')
         channel_id = data.get('channel') or data.get('message', {}).get(
             'channel')
-        timestamp = data.get('ts') or data.get('message', {}).get('ts')
         subtype = data.get('subtype') or data.get('message', {}).get('subtype',
                                                                      'message')
-        if subtype == 'message_changed':
-            timestamp = data.get('message', {}).get('ts', timestamp)
 
         if user_id:
             frm = await slack.users.get(user_id)
@@ -159,7 +182,6 @@ class SlackMessage:
             frm=frm,
             text=text,
             subtype=subtype,
-            timestamp=timestamp,
             content=content,
             raw=data,
         )

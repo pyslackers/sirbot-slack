@@ -178,7 +178,8 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Sent: %s', data)
         rep = await self._do_post(APIPath.MSG_POST, msg=data)
-        return rep
+        rep['message']['channel'] = rep['channel']
+        return rep['message']
 
     async def response(self, data, url):
         """
@@ -190,7 +191,8 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Sent: %s', data)
         rep = await self._do_json(url, msg=data)
-        return rep
+        rep['message']['channel'] = rep['channel']
+        return rep['message']
 
     async def update(self, message):
         """

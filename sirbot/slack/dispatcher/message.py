@@ -1,10 +1,11 @@
 import asyncio
-import functools
 import inspect
 import logging
 import re
 from collections import defaultdict
 from sqlite3 import IntegrityError
+
+from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
 from .. import database
@@ -18,7 +19,7 @@ IGNORING = ['message_changed', 'message_deleted', 'channel_join',
 
 class MessageDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
-                 save, loop):
+                 threads, save, loop):
 
         super().__init__(
             http_client=http_client,
@@ -32,7 +33,7 @@ class MessageDispatcher(SlackDispatcher):
         )
 
         self.bot = None
-        self._threads = dict()
+        self._threads = threads
 
     async def incoming(self, msg):
         """
@@ -123,9 +124,11 @@ class MessageDispatcher(SlackDispatcher):
         handlers = list()
 
         if msg.thread in self._threads:
-            logger.debug('Located thread handler for "%s"', msg.thread)
-            handlers.append((self._threads[msg.thread], ''))
-            del self._threads[msg.thread]
+            if self._threads[msg.thread][1] is True\
+                    or msg.frm.id == self._threads[msg.thread][1]:
+                logger.debug('Located thread handler for "%s"', msg.thread)
+                handlers.append((self._threads[msg.thread][0], ''))
+                del self._threads[msg.thread]
         else:
             for match, commands in self._endpoints.items():
                 n = match.search(msg.text)
@@ -143,24 +146,4 @@ class MessageDispatcher(SlackDispatcher):
 
         for func in handlers:
             f = func[0](msg, slack_facade, facades, func[1])
-            self.ensure_handler(coroutine=f, msg=msg)
-
-    def ensure_handler(self, coroutine, msg):
-        callback = functools.partial(self.handler_done_callback,
-                                     msg=msg)
-        task = asyncio.ensure_future(coroutine, loop=self._loop)
-        task.add_done_callback(callback)
-
-    def handler_done_callback(self, f, msg):
-
-        try:
-            result = f.result()
-        except Exception as e:
-            logger.exception(e)
-            raise
-
-        if result:
-            thread = msg.thread or msg.timestamp
-            callback = result
-            logger.debug('Adding thread "%s" handler', thread)
-            self._threads[thread] = callback
+            ensure_future(coroutine=f, loop=self._loop, logger=logger)

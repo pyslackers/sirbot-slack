@@ -50,6 +50,7 @@ class SirBotSlack(Plugin):
         self._messages = None
         self._pm = None
 
+        self._threads = dict()
         self._dispatcher = dict()
         self._started = False
 
@@ -139,6 +140,7 @@ class SirBotSlack(Plugin):
                 facades=self._facades,
                 save=self._config['save']['messages'],
                 loop=self._loop,
+                threads=self._threads
             )
 
             self._dispatcher['event'] = EventDispatcher(
@@ -224,7 +226,8 @@ class SirBotSlack(Plugin):
             groups=self._groups,
             messages=self._messages,
             bot=self.bot,
-            facades=self._facades
+            facades=self._facades,
+            threads=self._threads
         )
 
     async def start(self):
