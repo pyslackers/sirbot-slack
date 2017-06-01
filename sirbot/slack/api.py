@@ -38,6 +38,7 @@ class APIPath:
     RTM_CONNECT = SLACK_API_ROOT.format('rtm.connect')
 
     USER_INFO = SLACK_API_ROOT.format('users.info')
+    USER_LIST = SLACK_API_ROOT.format('users.list')
 
     BOT_INFO = SLACK_API_ROOT.format('bots.info')
 
@@ -167,7 +168,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.MSG_DELETE, msg=message)
         return rep.get('ts')
 
-    async def send(self, message):
+    async def send(self, data):
         """
         Send a new message
 
@@ -175,17 +176,11 @@ class HTTPClient(APICaller):
         :type message: Message
         :return: Raw message content
         """
-        logger.debug('Message Sent: %s', message)
-        data = message.serialize(type_='send')
-        rep = await self._do_post(
-            APIPath.MSG_POST,
-            msg=data,
-            token=self._bot_token
-        )
-
+        logger.debug('Message Sent: %s', data)
+        rep = await self._do_post(APIPath.MSG_POST, msg=data)
         return rep
 
-    async def response(self, message):
+    async def response(self, data, url):
         """
         Send a message in response to a slash command / an action
 
@@ -193,9 +188,8 @@ class HTTPClient(APICaller):
         :type message: Message
         :return: Slack API response ('ok')
         """
-        logger.debug('Message Sent: %s', message)
-        data = message.serialize(type_='response')
-        rep = await self._do_json(message.response_url, msg=data)
+        logger.debug('Message Sent: %s', data)
+        rep = await self._do_json(url, msg=data)
         return rep
 
     async def update(self, message):
@@ -333,6 +327,11 @@ class HTTPClient(APICaller):
 
         rep = await self._do_post(APIPath.GROUP_INFO, msg=msg)
         return rep['group']
+
+    async def get_users(self):
+
+        rep = await self._do_post(APIPath.USER_LIST)
+        return rep['members']
 
     async def get_user_info(self, user_id: str):
         """

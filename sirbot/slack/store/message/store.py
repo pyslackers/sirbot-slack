@@ -1,7 +1,7 @@
 import logging
 
-from .. import database
-from ..message import SlackMessage
+from .message import SlackMessage
+from ... import database
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,5 @@ class MessageStore:
             )
             messages.append(message)
             logger.debug('----' * 20)
-
 
         return messages

@@ -3,13 +3,12 @@ import functools
 import inspect
 import logging
 import re
-
 from collections import defaultdict
 from sqlite3 import IntegrityError
 
 from .dispatcher import SlackDispatcher
 from .. import database
-from ..message import SlackMessage
+from ..store.message import SlackMessage
 
 logger = logging.getLogger(__name__)
 

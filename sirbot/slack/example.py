@@ -3,7 +3,7 @@ import re
 
 import aiohttp
 
-from .message import Attachment, Field, Button, Select
+from sirbot.slack.message import Attachment, Field, Button, Select
 from .hookimpl import hookimpl
 
 logger = logging.getLogger(__name__)

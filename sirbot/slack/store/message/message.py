@@ -1,7 +1,9 @@
 import json
 import logging
 
-from ..errors import SlackMessageError
+
+from ..user import User
+from ...errors import SlackMessageError
 
 logger = logging.getLogger('sirbot.slack')
 
@@ -51,7 +53,7 @@ class SlackMessage:
     def thread(self, _):
         raise ValueError
 
-    def serialize(self, type_='send'):
+    def serialize(self, type_='send', to='rtm'):
 
         if type_ == 'response':
             data = self.content.serialize(attachment_type='string')
@@ -60,7 +62,10 @@ class SlackMessage:
         else:
             data = self.content.serialize(attachment_type='json')
 
-        data['channel'] = self.to.send_id
+        if to == 'event' and isinstance(self.to, User):
+            data['channel'] = '@' + self.to.name
+        else:
+            data['channel'] = self.to.send_id
 
         if self.timestamp:
             data['ts'] = self.timestamp
@@ -70,9 +75,13 @@ class SlackMessage:
 
         return data
 
-    def response(self, thread=True):
+    def response(self, thread=False):
 
-        raw = {'thread_ts': self.thread}
+        if thread:
+            raw = {'thread_ts': self.thread}
+        else:
+            raw = dict()
+
         if self.to.id.startswith('U'):
             rep = SlackMessage(
                 to=self.frm,

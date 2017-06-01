@@ -240,11 +240,15 @@ class SirBotSlack(Plugin):
         if self._rtm_client:
             data = await self._http_client.rtm_connect()
             self.bot = await self._users.get(data['self']['id'])
+            self.bot.type = 'rtm'
             self._dispatcher['message'].bot = self.bot
             self._dispatcher['event'].bot = self.bot
             await self._rtm_client.connect(url=data['url'])
         else:
             self.bot = User(id_='B000000000')
+            self.bot.type = 'event'
+            self._dispatcher['message'].bot = self.bot
+            self._dispatcher['event'].bot = self.bot
             self._started = True
 
     async def _rtm_reconnect(self):

@@ -33,23 +33,20 @@ class SlackFacade:
         """
         for message in messages:
 
-            if isinstance(message.to, User):
+            if self.bot.type == 'rtm' and isinstance(message.to, User):
                 await self.users.ensure_dm(message.to)
-
-            if message.content.username:
-                # Necessary to store the correct event in db
-                # Without custom username the message is sent as a regular
-                # user
-                message.subtype = 'bot_message'
 
             message.frm = self.bot
 
             if message.response_url:
                 # Message with a response url are response to actions or slash
                 # commands
-                await self._http_client.response(message=message)
+                data = message.serialize(type_='response')
+                await self._http_client.response(data=data,
+                                                 url=message.response_url)
             else:
-                message.raw = await self._http_client.send(message=message)
+                data = message.serialize(type_='send', to=self.bot.type)
+                message.raw = await self._http_client.send(data=data)
                 # await self._save_outgoing_message(message)
 
     async def update(self, *messages):
@@ -68,7 +65,7 @@ class SlackFacade:
             message.raw = await self._http_client.update(message=message)
             message.ts = message.raw.get('ts')
 
-            await self._save_outgoing_message(message)
+            # await self._save_outgoing_message(message)
 
     async def delete(self, *messages):
         """
