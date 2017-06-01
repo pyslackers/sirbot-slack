@@ -29,13 +29,13 @@ class GroupStore(SlackStore):
     async def all(self):
         pass
 
-    async def get(self, id_=None, update=False):
+    async def get(self, id_=None, fetch=False):
 
         db = self._facades.get('database')
         data = await database.__dict__[db.type].group.find(db, id_)
 
         if data and (
-                update or data['last_update'] < (time.time() - self._refresh)):
+                fetch or data['last_update'] < (time.time() - self._refresh)):
             group = await self._query(id_)
 
             if group:

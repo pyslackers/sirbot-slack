@@ -9,7 +9,7 @@ from sirbot.utils import ensure_future
 from .dispatcher import SlackDispatcher
 from .. import database
 from ..errors import SlackUnknownCommand
-from ..message.command import SlackCommand
+from ..store.message.command import SlackCommand
 
 logger = logging.getLogger(__name__)
 

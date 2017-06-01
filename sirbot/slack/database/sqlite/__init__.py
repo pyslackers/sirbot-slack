@@ -1,6 +1,6 @@
 # flake8: noqa
 
-from . import user, channel, group, update, dispatcher
+from . import user, channel, group, update, dispatcher, message
 
 
 async def create_table(db):
@@ -37,7 +37,7 @@ async def create_table(db):
     from_id TEXT,
     to_id TEXT,
     type TEXT,
-    conversation REAL,
+    thread REAL,
     mention BOOLEAN,
     text TEXT,
     raw TEXT,

@@ -24,7 +24,7 @@ Hooks
 Two hooks are available. The first one to register function on slack messages and the second
 one on slack events
 
-.. literalinclude:: ../sirbot_plugin_slack/hookspecs.py
+.. literalinclude:: ../sirbot/slack/hookspecs.py
 
 Messages
 ^^^^^^^^
@@ -80,4 +80,4 @@ Example
 
 Full examples are available in the :code:`example.py` file
 
-.. literalinclude:: ../sirbot_plugin_slack/example.py
+.. literalinclude:: ../sirbot/slack/example.py

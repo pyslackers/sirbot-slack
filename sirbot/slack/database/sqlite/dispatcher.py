@@ -33,21 +33,14 @@ async def save_incoming_event(db, ts, user, event):
 
 async def save_incoming_message(db, message):
     await db.execute('''INSERT INTO slack_messages
-                      (ts, from_id, to_id, type, conversation, mention,
+                      (ts, from_id, to_id, type, thread, mention,
                       text, raw)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                       ''',
                      (message.timestamp, message.frm.id, message.to.id,
-                      message.subtype, message.conversation,
+                      message.subtype, message.thread,
                       message.mention, message.text,
                       json.dumps(message.raw))
-                     )
-
-
-async def update_conversation_id(db, message):
-    await db.execute('''UPDATE slack_messages SET conversation=?
-                         WHERE ts=?'''
-                     , (message.conversation, message.timestamp)
                      )
 
 

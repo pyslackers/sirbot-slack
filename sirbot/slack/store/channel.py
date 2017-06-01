@@ -47,7 +47,7 @@ class ChannelStore(SlackStore):
 
         return channels
 
-    async def get(self, id_=None, name=None, update=False):
+    async def get(self, id_=None, name=None, fetch=False):
         """
         Return a Channel from the Channel Manager
 
@@ -67,7 +67,7 @@ class ChannelStore(SlackStore):
             data = await database.__dict__[db.type].channel.find_by_id(db, id_)
 
         if data and (
-                update or data['last_update'] < (time.time() - self._refresh)):
+                fetch or data['last_update'] < (time.time() - self._refresh)):
             channel = await self._query_by_id(data['id'])
 
             if channel:
@@ -142,7 +142,7 @@ async def channel_archive(event, slack, _):
     Use the channel archive event to delete the channel
     from the ChannelManager
     """
-    await slack.channels.get(event['channel'], update=True)
+    await slack.channels.get(event['channel'], fetch=True)
 
 
 async def channel_created(event, slack, _):
@@ -150,7 +150,7 @@ async def channel_created(event, slack, _):
     Use the channel created event to add the channel
     to the ChannelManager
     """
-    await slack.channels.get(event['channel']['id'], update=True)
+    await slack.channels.get(event['channel']['id'], fetch=True)
 
 
 async def channel_deleted(event, slack, _):
@@ -158,21 +158,21 @@ async def channel_deleted(event, slack, _):
     Use the channel delete event to delete the channel
     from the ChannelManager
     """
-    await slack.channels.get(event['channel'], update=True)
+    await slack.channels.get(event['channel'], fetch=True)
 
 
 async def channel_joined(event, slack, _):
     """
     Use the channel joined event to update the channel status
     """
-    await slack.channels.get(event['channel']['id'], update=True)
+    await slack.channels.get(event['channel']['id'], fetch=True)
 
 
 async def channel_left(event, slack, _):
     """
     Use the channel left event to update the channel status
     """
-    await slack.channels.get(event['channel'], update=True)
+    await slack.channels.get(event['channel'], fetch=True)
 
 
 async def channel_rename(event, slack, _):
@@ -180,7 +180,7 @@ async def channel_rename(event, slack, _):
     User the channel rename event to update the name
     of the channel
     """
-    await slack.channels.get(event['channel']['id'], update=True)
+    await slack.channels.get(event['channel']['id'], fetch=True)
 
 
 async def channel_unarchive(event, slack, _):
@@ -188,7 +188,7 @@ async def channel_unarchive(event, slack, _):
     Use the channel unarchive event to delete the channel
     from the ChannelManager
     """
-    await slack.channels.get(event['channel'], update=True)
+    await slack.channels.get(event['channel'], fetch=True)
 
 
 @hookimpl

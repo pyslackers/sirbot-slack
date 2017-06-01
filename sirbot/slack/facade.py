@@ -1,7 +1,5 @@
-import json
 import logging
 
-from .message.message import SlackMessage
 from .store.user import User
 
 logger = logging.getLogger(__name__)
@@ -15,10 +13,14 @@ class SlackFacade:
     allow cross service messages
     """
 
-    def __init__(self, http_client, users, channels, groups, bot, facades):
+    def __init__(self, http_client, users, channels, groups, messages, threads,
+                 bot, facades):
+
         self._facades = facades
         self._http_client = http_client
+        self._threads = threads
 
+        self.messages = messages
         self.users = users
         self.channels = channels
         self.groups = groups
@@ -32,24 +34,28 @@ class SlackFacade:
         """
         for message in messages:
 
-            if isinstance(message.to, User):
+            if self.bot.type == 'rtm' and isinstance(message.to, User):
                 await self.users.ensure_dm(message.to)
-
-            if message.content.username:
-                # Necessary to store the correct event in db
-                # Without custom username the message is sent as a regular
-                # user
-                message.subtype = 'bot_message'
 
             message.frm = self.bot
 
             if message.response_url:
                 # Message with a response url are response to actions or slash
                 # commands
-                await self._http_client.response(message=message)
+                data = message.serialize(type_='response')
+                message.raw = await self._http_client.response(
+                    data=data,
+                    url=message.response_url
+                )
             else:
-                message.raw = await self._http_client.send(message=message)
+                data = message.serialize(type_='send', to=self.bot.type)
+                message.raw = await self._http_client.send(data=data)
                 # await self._save_outgoing_message(message)
+
+            if message.thread_callback:
+                logger.debug('Adding thread callback: %s', message.thread)
+                logger.warning(message.raw)
+                self._threads[message.thread] = message.thread_callback
 
     async def update(self, *messages):
         """
@@ -67,7 +73,7 @@ class SlackFacade:
             message.raw = await self._http_client.update(message=message)
             message.ts = message.raw.get('ts')
 
-            await self._save_outgoing_message(message)
+            # await self._save_outgoing_message(message)
 
     async def delete(self, *messages):
         """
@@ -130,63 +136,3 @@ class SlackFacade:
 
         message.reactions = reactions
         return reactions
-
-    async def conversation(self, msg, limit=0):
-        query = '''SELECT raw FROM slack_messages
-                             WHERE conversation_id=? AND ts <= ?
-                             ORDER BY ts DESC'''
-
-        db = self._facades.get('database')
-
-        if limit:
-            query += ' LIMIT ?'
-            await db.execute(query,
-                             (msg.conversation_id, msg.timestamp, limit))
-        else:
-            await db.execute(query, (msg.conversation_id, msg.timestamp))
-
-        raw_msgs = await db.fetchall()
-        messages = list()
-        for message in raw_msgs:
-            m = await SlackMessage.from_raw(
-                json.loads(message['raw']),
-                slack=self
-            )
-            messages.append(m)
-        return messages
-
-    # async def _save_outgoing_message(self, message):
-    #     """
-    #     Store outgoing message in db
-    #
-    #     :param msg: message
-    #     :param db: db facade
-    #     :return: None
-    #     """
-    #     message.timestamp = message.raw.get('ts')
-    #
-    #     logger.debug('Saving outgoing msg to %s at %s',
-    #                  message.to.id, message.timestamp)
-    #
-    #     if not message.conversation:
-    #         message.conversation = message.timestamp
-    #
-    #     db = self._facades.get('database')
-    #     try:
-    #         await db.execute('''INSERT INTO slack_messages
-    #                           (ts, from_id, to_id,
-        # type, conversation, mention,
-    #                           text, raw)
-    #                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    #                           ''',
-    #                          (message.timestamp,
-        #  message.frm.id, message.to.id,
-    #                           message.subtype, message.conversation, False,
-    #                           message.text, json.dumps(message.raw))
-    #                          )
-    #     except sqlite3.IntegrityError:
-    #         await db.execute('''UPDATE slack_messages SET conversation=?
-    #                             WHERE ts=?''',
-    #                          (message.conversation, message.timestamp))
-    #
-    #     await db.commit()

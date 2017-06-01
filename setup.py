@@ -64,7 +64,7 @@ setup(
         'sirbot.slack',
         'sirbot.slack.dispatcher',
         'sirbot.slack.store',
-        'sirbot.slack.message',
+        'sirbot.slack.store.message',
         'sirbot.slack.database',
         'sirbot.slack.database.sqlite'
     ],
@@ -72,7 +72,7 @@ setup(
         'sirbot.slack': 'sirbot/slack',
         'sirbot.slack.dispatcher': 'sirbot/slack/dispatcher',
         'sirbot.slack.store': 'sirbot/slack/store',
-        'sirbot.slack.message': 'sirbot/slack/message',
+        'sirbot.slack.store.message': 'sirbot/slack/store/message',
         'sirbot.slack.database': 'sirbot/slack/database',
         'sirbot.slack.database.sqlite': 'sirbot/slack/database/sqlite',
     },
