@@ -7,7 +7,6 @@ import json
 from aiohttp.web import Response
 
 from .dispatcher import SlackDispatcher
-from .message import MessageDispatcher
 from .. import database
 from collections import defaultdict
 from sirbot.utils import ensure_future

@@ -9,7 +9,10 @@ from sirbot.utils import merge_dict
 from sirbot.core import Plugin
 
 from . import hookspecs, database
-from .dispatcher import EventDispatcher, ActionDispatcher, CommandDispatcher, MessageDispatcher
+from .dispatcher import (EventDispatcher,
+                         ActionDispatcher,
+                         CommandDispatcher,
+                         MessageDispatcher)
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
 from .errors import SlackClientError, SlackSetupError

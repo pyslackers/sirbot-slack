@@ -41,6 +41,7 @@ class SlackMessageError(MessageError):
 class SlackUnknownEndpoint(MessageError):
     """"""
 
+
 class SlackUnknownAction(SlackUnknownEndpoint):
     """Unknown incoming action"""
 
