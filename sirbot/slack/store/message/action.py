@@ -29,7 +29,6 @@ class SlackAction:
         return SlackMessage(
             to=self.to,
             response_url=self.response_url,
-            timestamp=self.message_ts
         )
 
     @classmethod
