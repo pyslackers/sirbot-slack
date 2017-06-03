@@ -45,6 +45,7 @@ class APIPath:
     AUTH_TEST = SLACK_API_ROOT.format('auth.test')
 
     IM_OPEN = SLACK_API_ROOT.format('im.open')
+    IM_LIST = SLACK_API_ROOT.format('im.list')
 
 
 class APICaller:
@@ -89,7 +90,7 @@ class APICaller:
         logger.debug('Querying SLACK HTTP API: %s', url)
         msg['token'] = token or self._token
         async with self._session.post(url, data=msg) as response:
-            return await self._validate_response(response)
+            return await self._validate_response(response, url)
 
     async def _do_json(self, url, *, msg=None, token=None):
         """
@@ -113,9 +114,9 @@ class APICaller:
                 data=json.dumps(msg),
                 headers={'content-type': 'application/json; charset=utf-8'}
         ) as response:
-            return await self._validate_response(response)
+            return await self._validate_response(response, url)
 
-    async def _validate_response(self, response):
+    async def _validate_response(self, response, url):
         if 200 <= response.status < 300:
 
             if response.headers['Content-Type'].startswith('application/json'):
@@ -128,10 +129,10 @@ class APICaller:
                     rep = {'ok': False, 'response': rep}
 
             if rep['ok'] is True:
-                logger.debug('Slack HTTP API response: OK')
+                logger.debug('Slack HTTP API response: OK for %s', url)
                 return rep
             else:
-                logger.warning('Slack HTTP API response: %s', rep)
+                logger.warning('Slack HTTP API response: %s for %s', rep, url)
                 raise SlackAPIError(rep)
         elif 300 <= response.status < 400:
             e = 'Redirection, status code: {}'.format(response.status)
@@ -168,7 +169,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.MSG_DELETE, msg=message)
         return rep.get('ts')
 
-    async def send(self, data):
+    async def send(self, data, token):
         """
         Send a new message
 
@@ -177,7 +178,13 @@ class HTTPClient(APICaller):
         :return: Raw message content
         """
         logger.debug('Message Sent: %s', data)
-        rep = await self._do_post(APIPath.MSG_POST, msg=data)
+        if token == 'bot':
+            rep = await self._do_post(APIPath.MSG_POST,
+                                      msg=data,
+                                      token=self._bot_token)
+        else:
+            rep = await self._do_post(APIPath.MSG_POST, msg=data)
+
         rep['message']['channel'] = rep['channel']
         return rep['message']
 
@@ -191,8 +198,7 @@ class HTTPClient(APICaller):
         """
         logger.debug('Message Sent: %s', data)
         rep = await self._do_json(url, msg=data)
-        rep['message']['channel'] = rep['channel']
-        return rep['message']
+        return rep
 
     async def update(self, message):
         """
@@ -371,14 +377,14 @@ class HTTPClient(APICaller):
 
         return rep['channel']['id']
 
+    async def get_dms(self):
+
+        rep = await self._do_post(APIPath.IM_LIST, token=self._bot_token)
+        return rep
+
     async def get_bot_info(self, bot=None):
 
-        if bot:
-            rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
-        else:
-            rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
-            logger.warning(rep)
-
+        rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
         return rep['bot']
 
     async def rtm_connect(self):

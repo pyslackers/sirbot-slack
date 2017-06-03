@@ -14,7 +14,7 @@ from ..store.message import SlackMessage
 logger = logging.getLogger(__name__)
 
 IGNORING = ['message_changed', 'message_deleted', 'channel_join',
-            'channel_leave', 'message_replied']
+            'channel_leave', 'message_replied', 'bot_message']
 
 
 class MessageDispatcher(SlackDispatcher):

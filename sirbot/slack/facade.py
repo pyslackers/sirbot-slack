@@ -43,18 +43,25 @@ class SlackFacade:
                 # Message with a response url are response to actions or slash
                 # commands
                 data = message.serialize(type_='response')
-                message.raw = await self._http_client.response(
+                await self._http_client.response(
                     data=data,
                     url=message.response_url
                 )
+            elif isinstance(message.to, User) and self.bot.type == 'rtm':
+                data = message.serialize(type_='send', to=self.bot.type)
+                message.raw = await self._http_client.send(
+                    data=data,
+                    token='bot'
+                )
+            elif isinstance(message.to, User) and self.bot.type == 'event':
+                data = message.serialize(type_='send', to=self.bot.type)
+                message.raw = await self._http_client.send(data=data)
             else:
                 data = message.serialize(type_='send', to=self.bot.type)
                 message.raw = await self._http_client.send(data=data)
-                # await self._save_outgoing_message(message)
 
             if message.thread_callback:
                 logger.debug('Adding thread callback: %s', message.thread)
-                logger.warning(message.raw)
                 self._threads[message.thread] = message.thread_callback
 
     async def update(self, *messages):
