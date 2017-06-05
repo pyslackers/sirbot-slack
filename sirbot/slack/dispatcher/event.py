@@ -76,6 +76,7 @@ class EventDispatcher(SlackDispatcher):
             return Response(status=500)
 
     async def _incoming(self, event):
+        logger.debug('Event handler received: %s', event)
 
         facades = self._facades.new()
         slack = facades.get('slack')
