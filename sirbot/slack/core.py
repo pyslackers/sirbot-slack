@@ -93,6 +93,10 @@ class SirBotSlack(Plugin):
                 ' must be set'
             )
 
+        if self._config['rtm'] and not self._bot_token:
+            raise SlackSetupError('SIRBOT_SLACK_BOT_TOKEN must be set to use'
+                                  'the rtm API')
+
         if self._app_token and not self._verification_token:
             raise SlackSetupError(
                 'SIRBOT_SLACK_VERIFICATION_TOKEN must be set'
@@ -130,7 +134,7 @@ class SirBotSlack(Plugin):
             facades=self._facades
         )
 
-        if self._bot_token or self._config['endpoints']['events']:
+        if self._config['rtm'] or self._config['endpoints']['events']:
             logger.debug('Adding events endpoint: %s',
                          self._config['endpoints']['events'])
 
@@ -159,7 +163,7 @@ class SirBotSlack(Plugin):
                 token=self._verification_token
             )
 
-            if self._bot_token:
+            if self._config['rtm']:
                 self._rtm_client = RTMClient(
                     bot_token=self._bot_token,
                     loop=self._loop,
@@ -253,8 +257,10 @@ class SirBotSlack(Plugin):
         else:
             self.bot = User(id_='B000000000')
             self.bot.type = 'event'
-            self._dispatcher['message'].bot = self.bot
-            self._dispatcher['event'].bot = self.bot
+            if 'message' in self._dispatcher:
+                self._dispatcher['message'].bot = self.bot
+            if 'event' in self._dispatcher:
+                self._dispatcher['event'].bot = self.bot
             self._started = True
 
     async def _rtm_reconnect(self):
