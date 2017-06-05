@@ -169,7 +169,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.MSG_DELETE, msg=message)
         return rep.get('ts')
 
-    async def send(self, data, token):
+    async def send(self, data, token='app'):
         """
         Send a new message
 
