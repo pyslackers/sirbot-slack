@@ -1,5 +1,5 @@
 slack:
-  id: B00000000
+  rtm: false
   save:
     messages: false
     events: false
