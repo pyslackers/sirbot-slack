@@ -1,8 +1,16 @@
-from sirbot.core.errors import MessageError, SirBotALotError
+from sirbot.core.errors import SirBotALotError
 
 
-class SlackClientError(SirBotALotError):
-    """Generic slack client error"""
+class SlackError(SirBotALotError):
+    """Generic slack error"""
+
+
+class SlackSetupError(SlackError):
+    """Error during slack plugin configuration"""
+
+
+class SlackClientError(SlackError):
+    """Error with the slack API"""
 
 
 class SlackConnectionError(SlackClientError):
@@ -26,19 +34,11 @@ class SlackAPIError(SlackClientError):
         self.response = response
 
 
-# class SlackChannelNotFound(SlackClientError):
-#     """Channel non existent or not available to the bot"""
-#
-#     def __init__(self, id_=None, name=None):
-#         self.id = id_
-#         self.name = name
-
-
-class SlackMessageError(MessageError):
+class SlackMessageError(SlackError):
     """Generic slack message error"""
 
 
-class SlackUnknownEndpoint(MessageError):
+class SlackUnknownEndpoint(SlackError):
     """"""
 
 
@@ -54,7 +54,3 @@ class SlackUnknownCommand(SlackUnknownEndpoint):
 
     def __init__(self, command):
         self.command = command
-
-
-class SlackSetupError(SirBotALotError):
-    """Error during slack plugin configuration"""
