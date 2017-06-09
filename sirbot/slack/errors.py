@@ -1,7 +1,7 @@
-from sirbot.core.errors import SirBotALotError
+from sirbot.core.errors import SirBotError
 
 
-class SlackError(SirBotALotError):
+class SlackError(SirBotError):
     """Generic slack error"""
 
 
