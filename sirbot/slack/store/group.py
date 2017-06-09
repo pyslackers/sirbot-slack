@@ -4,7 +4,6 @@ import time
 
 from .store import SlackStore, SlackChannelItem
 from .. import database
-from ..hookimpl import hookimpl
 
 logger = logging.getLogger(__name__)
 
@@ -84,70 +83,3 @@ class GroupStore(SlackStore):
             last_update=time.time()
         )
         return group
-
-
-async def group_archive(event, slack, _):
-    """
-    Use the channel archive event to delete the channel
-    from the ChannelManager
-    """
-    await slack.groups.get(event['channel'], update=True)
-
-
-async def group_joined(event, slack, _):
-    """
-    Use the channel joined event to update the channel status
-    """
-    await slack.groups.get(event['channel']['id'], update=True)
-
-
-async def group_left(event, slack, _):
-    """
-    Use the channel left event to update the channel status
-    """
-    await slack.groups.get(event['channel'], update=True)
-
-
-async def group_rename(event, slack, _):
-    """
-    User the channel rename event to update the name
-    of the channel
-    """
-    await slack.groups.get(event['channel']['id'], update=True)
-
-
-async def group_unarchive(event, slack, _):
-    """
-    Use the channel unarchive event to delete the channel
-    from the ChannelManager
-    """
-    await slack.groups.get(event['channel'], update=True)
-
-
-@hookimpl
-def register_slack_events():
-    events = [
-        {
-            'event': 'group_archive',
-            'func': group_archive
-        },
-        {
-            'event': 'group_joined',
-            'func': group_joined
-        },
-        {
-            'event': 'group_left',
-            'func': group_left,
-        },
-        {
-            'event': 'group_rename',
-            'func': group_rename,
-        },
-        {
-            'event': 'group_unarchive',
-            'func': group_unarchive,
-
-        }
-    ]
-
-    return events

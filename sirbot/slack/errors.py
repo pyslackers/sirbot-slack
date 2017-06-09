@@ -9,6 +9,10 @@ class SlackSetupError(SlackError):
     """Error during slack plugin configuration"""
 
 
+class SlackInactiveDispatcher(SlackSetupError):
+    """Raised when adding endpoint to a missing dispatcher"""
+
+
 class SlackClientError(SlackError):
     """Error with the slack API"""
 

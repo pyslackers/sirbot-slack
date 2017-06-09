@@ -30,6 +30,7 @@ class EventDispatcher(SlackDispatcher):
             loop=loop
         )
 
+        self._endpoints = defaultdict(list)
         self._message_dispatcher = message_dispatcher
         self._token = token
         self.bot = None
@@ -90,27 +91,16 @@ class EventDispatcher(SlackDispatcher):
             f = func(event, slack, facades)
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
-    def _register(self):
-        """
-        Find and register the functions handling specifics events
+    def register(self, event, func):
 
-        hookspecs: def register_slack_events()
+        logger.debug('Registering event: %s, %s from %s',
+                     event,
+                     func.__name__,
+                     inspect.getabsfile(func))
 
-        :param pm: pluggy plugin store
-        :return None
-        """
-        self._endpoints = defaultdict(list)
-        all_events = self._plugins.hook.register_slack_events()
-        for events in all_events:
-            for event in events:
-                if not asyncio.iscoroutinefunction(event['func']):
-                    logger.debug('Function is not a coroutine, converting.')
-                    event['func'] = asyncio.coroutine(event['func'])
-                logger.debug('Registering event: %s, %s from %s',
-                             event['event'],
-                             event['func'].__name__,
-                             inspect.getabsfile(event['func']))
-                self._endpoints[event['event']].append(event['func'])
+        if not asyncio.iscoroutinefunction(func):
+            func = asyncio.coroutine(func)
+        self._endpoints[event].append(func)
 
     async def _store_incoming(self, event, db):
         """

@@ -65,28 +65,19 @@ class CommandDispatcher(SlackDispatcher):
             return Response(
                 status=200,
                 body=json.dumps({"response_type": "in_channel"}),
-                content_type='application/json; charset=utf-8'
+                content_type='application/json'
             )
         else:
             return Response(status=200)
 
-    def _register(self):
-        """
-        Find and register the functions handling specifics events
+    def register(self, command, func, public=False):
+        logger.debug('Registering slash command: %s, %s from %s',
+                     command,
+                     func.__name__,
+                     inspect.getabsfile(func))
 
-        hookspecs: def register_slack_events()
+        if not asyncio.iscoroutinefunction(func):
+            func = asyncio.coroutine(func)
 
-        :param pm: pluggy plugin store
-        :return None
-        """
-        all_commands = self._plugins.hook.register_slack_commands()
-        for commands in all_commands:
-            for command in commands:
-                if not asyncio.iscoroutinefunction(command['func']):
-                    logger.debug('Function is not a coroutine, converting.')
-                    command['func'] = asyncio.coroutine(command['func'])
-                logger.debug('Registering slash command: %s, %s from %s',
-                             command['command'],
-                             command['func'].__name__,
-                             inspect.getabsfile(command['func']))
-                self._endpoints[command['command']] = command
+        settings = {'func': func, 'public': public}
+        self._endpoints[command] = settings

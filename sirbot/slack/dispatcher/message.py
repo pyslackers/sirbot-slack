@@ -34,6 +34,7 @@ class MessageDispatcher(SlackDispatcher):
 
         self.bot = None
         self._threads = threads
+        self._endpoints = defaultdict(list)
 
     async def incoming(self, msg):
         """
@@ -90,27 +91,23 @@ class MessageDispatcher(SlackDispatcher):
         )
         await db.commit()
 
-    def _register(self):
-        """
-        Find and register the functions handling specifics messages
+    def register(self, match, func, flags=0, mention=False, admin=False):
 
-        hookspecs: def register_slack_events()
+        logger.debug('Registering message: %s, %s from %s',
+                     match,
+                     func.__name__,
+                     inspect.getabsfile(func))
 
-        :param pm: pluggy plugin store
-        """
-        self._endpoints = defaultdict(list)
-        all_messages = self._plugins.hook.register_slack_messages()
-        for messages in all_messages:
-            for msg in messages:
-                if not asyncio.iscoroutinefunction(msg['func']):
-                    logger.debug('Function is not a coroutine, converting.')
-                    msg['func'] = asyncio.coroutine(msg['func'])
-                logger.debug('Registering message: %s, %s in %s',
-                             msg['match'],
-                             msg['func'].__name__,
-                             inspect.getabsfile(msg['func']))
-                self._endpoints[re.compile(msg['match'],
-                                           msg.get('flags', 0))].append(msg)
+        if not asyncio.iscoroutinefunction(func):
+            func = asyncio.coroutine(func)
+
+        option = {
+            'func': func,
+            'mention': mention,
+            'admin': admin
+        }
+
+        self._endpoints[re.compile(match, flags)].append(option)
 
     async def _dispatch(self, msg, slack_facade, facades, db):
         """

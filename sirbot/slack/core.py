@@ -1,14 +1,12 @@
 import asyncio
-import importlib
 import logging
 import os
-import pluggy
 import yaml
 
 from sirbot.utils import merge_dict
 from sirbot.core import Plugin
 
-from . import hookspecs, database
+from . import database, sync
 from .dispatcher import (EventDispatcher,
                          ActionDispatcher,
                          CommandDispatcher,
@@ -101,8 +99,6 @@ class SirBotSlack(Plugin):
             raise SlackSetupError(
                 'SIRBOT_SLACK_VERIFICATION_TOKEN must be set'
             )
-
-        self._pm = self._initialize_plugins()
 
         self._http_client = HTTPClient(
             bot_token=self._bot_token,
@@ -234,7 +230,8 @@ class SirBotSlack(Plugin):
             messages=self._messages,
             bot=self.bot,
             facades=self._facades,
-            threads=self._threads
+            threads=self._threads,
+            dispatcher=self._dispatcher
         )
 
     async def start(self):
@@ -246,6 +243,9 @@ class SirBotSlack(Plugin):
                                   ', '.join(SUPPORTED_DATABASE))
 
         await self._create_db_table()
+
+        slack = self.facade()
+        sync.add_to_slack(slack)
 
         if self._rtm_client:
             data = await self._http_client.rtm_connect()
@@ -282,26 +282,6 @@ class SirBotSlack(Plugin):
                 await self._rtm_reconnect()
             else:
                 await self._dispatcher['event'].incoming_rtm(event)
-
-    def _initialize_plugins(self):
-        """
-        Import and register the plugins
-
-        Most likely composed of functions reacting to messages, events, slash
-        commands and actions
-        """
-        logger.debug('Initializing plugins of slack plugin')
-        pm = pluggy.PluginManager('sirbot.slack')
-        pm.add_hookspecs(hookspecs)
-
-        for plugin in MANDATORY_PLUGIN + self._config.get('plugins', []):
-            try:
-                p = importlib.import_module(plugin)
-                pm.register(p)
-            except Exception as e:
-                logger.exception(e)
-
-        return pm
 
     async def database_update(self, metadata, db):
 

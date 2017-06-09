@@ -1,10 +1,9 @@
 import logging
-import re
+# import re
 
 import aiohttp
 
 from sirbot.slack.message import Attachment, Field, Button, Select
-from .hookimpl import hookimpl
 
 logger = logging.getLogger(__name__)
 
@@ -143,51 +142,51 @@ async def parrot_next(message, slack, facades, *_):
 
         return {'func': parrot_next}
 
-
-@hookimpl
-def register_slack_messages():
-    messages = [
-        {
-            'match': 'test',
-            'func': test
-        },
-        {
-            'match': 'sirbot',
-            'func': react,
-        },
-        {
-            'match': '',
-            'func': react,
-            'mention': True
-        },
-        {
-            'match': '(([Cc]an|[Mm]ay) I have the )?quote of the day\?$',
-            'func': quote_of_the_day,
-            'mention': True
-        },
-        {
-            'match': 'test message',
-            'func': test_message,
-            'mention': True,
-            'flags': re.IGNORECASE
-        },
-        {
-            'match': 'parrot',
-            'func': parrot,
-            'mention': True,
-        }
-    ]
-
-    return messages
-
-
-@hookimpl
-def register_slack_events():
-    events = [
-        {
-            'func': hello_world,
-            'event': 'user_typing'
-        }
-    ]
-
-    return events
+#
+# @hookimpl
+# def register_slack_messages():
+#     messages = [
+#         {
+#             'match': 'test',
+#             'func': test
+#         },
+#         {
+#             'match': 'sirbot',
+#             'func': react,
+#         },
+#         {
+#             'match': '',
+#             'func': react,
+#             'mention': True
+#         },
+#         {
+#             'match': '(([Cc]an|[Mm]ay) I have the )?quote of the day\?$',
+#             'func': quote_of_the_day,
+#             'mention': True
+#         },
+#         {
+#             'match': 'test message',
+#             'func': test_message,
+#             'mention': True,
+#             'flags': re.IGNORECASE
+#         },
+#         {
+#             'match': 'parrot',
+#             'func': parrot,
+#             'mention': True,
+#         }
+#     ]
+#
+#     return messages
+#
+#
+# @hookimpl
+# def register_slack_events():
+#     events = [
+#         {
+#             'func': hello_world,
+#             'event': 'user_typing'
+#         }
+#     ]
+#
+#     return events

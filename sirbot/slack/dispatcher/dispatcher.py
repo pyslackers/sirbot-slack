@@ -24,8 +24,6 @@ class SlackDispatcher:
 
         self._endpoints = dict()
 
-        self._register()
-
     async def incoming(self, item):
         try:
             rep = await self._incoming(item)
@@ -37,5 +35,5 @@ class SlackDispatcher:
     async def _incoming(self, item):
         pass
 
-    def _register(self):
+    def register(self):
         pass

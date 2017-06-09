@@ -13,5 +13,3 @@ slack:
     commands: false
     actions: false
     events: false
-  plugins:
-    - sirbot.slack.example
