@@ -1,6 +1,7 @@
 import logging
 
 from .store.user import User
+from .errors import SlackInactiveDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +15,12 @@ class SlackFacade:
     """
 
     def __init__(self, http_client, users, channels, groups, messages, threads,
-                 bot, facades):
+                 bot, facades, dispatcher):
 
         self._facades = facades
         self._http_client = http_client
         self._threads = threads
+        self._dispatcher = dispatcher
 
         self.messages = messages
         self.users = users
@@ -143,3 +145,28 @@ class SlackFacade:
 
         message.reactions = reactions
         return reactions
+
+    def add_action(self, id_, func, public=False):
+        if 'action' in self._dispatcher:
+            self._dispatcher['action'].register(id_, func, public=public)
+        else:
+            raise SlackInactiveDispatcher
+
+    def add_event(self, event, func):
+        if 'event' in self._dispatcher:
+            self._dispatcher['event'].register(event, func)
+        else:
+            raise SlackInactiveDispatcher
+
+    def add_command(self, command, func, public=False):
+        if 'command' in self._dispatcher:
+            self._dispatcher['command'].register(command, func, public=public)
+        else:
+            raise SlackInactiveDispatcher
+
+    def add_message(self, match, func, flags=0, mention=False, admin=False):
+        if 'action' in self._dispatcher:
+            self._dispatcher['message'].register(match, func, flags, mention,
+                                                 admin)
+        else:
+            raise SlackInactiveDispatcher

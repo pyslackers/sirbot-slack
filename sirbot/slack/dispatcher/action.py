@@ -75,22 +75,14 @@ class ActionDispatcher(SlackDispatcher):
         else:
             return Response(status=200)
 
-    def _register(self):
-        """
-        Find and register the functions handling specifics events
+    def register(self, id_, func, public=False):
+        logger.debug('Registering action: %s, %s from %s',
+                     id_,
+                     func.__name__,
+                     inspect.getabsfile(func))
 
-        hookspecs: def register_slack_events()
+        if not asyncio.iscoroutinefunction(func):
+            func = asyncio.coroutine(func)
 
-        :return None
-        """
-        all_actions = self._plugins.hook.register_slack_actions()
-        for actions in all_actions:
-            for action in actions:
-                if not asyncio.iscoroutinefunction(action['func']):
-                    logger.debug('Function is not a coroutine, converting.')
-                    action['func'] = asyncio.coroutine(action['func'])
-                logger.debug('Registering action: %s, %s from %s',
-                             action['callback_id'],
-                             action['func'].__name__,
-                             inspect.getabsfile(action['func']))
-                self._endpoints[action['callback_id']] = action
+        settings = {'func': func, 'public': public}
+        self._endpoints[id_] = settings

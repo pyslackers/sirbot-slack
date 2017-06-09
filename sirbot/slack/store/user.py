@@ -3,7 +3,6 @@ import logging
 import time
 
 from .. import database
-from ..hookimpl import hookimpl
 from .store import SlackStore, SlackItem
 
 logger = logging.getLogger(__name__)
@@ -161,33 +160,3 @@ class UserStore(SlackStore):
             await database.__dict__[db.type].user.update_dm_id(
                 db, user.id, user.dm_id)
             await db.commit()
-
-
-async def user_typing(event, slack, _):
-    """
-    Use the user typing event to make sure the user is in cache
-    """
-    await slack.users.get(event['user'])
-
-
-async def team_join(event, slack, _):
-    """
-    Use the team join event to add an user to the user store
-    """
-    await slack.users.get(event['user']['id'])
-
-
-@hookimpl
-def register_slack_events():
-    events = [
-        {
-            'event': 'user_typing',
-            'func': user_typing
-        },
-        {
-            'event': 'team_join',
-            'func': team_join
-        }
-    ]
-
-    return events

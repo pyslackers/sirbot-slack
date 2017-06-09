@@ -4,7 +4,6 @@ import time
 
 from .store import SlackStore, SlackChannelItem
 from .. import database
-from ..hookimpl import hookimpl
 
 logger = logging.getLogger(__name__)
 
@@ -135,94 +134,3 @@ class ChannelStore(SlackStore):
             if channel['name'] == name:
                 c = await self.get(id_=channel['id'])
                 return c
-
-
-async def channel_archive(event, slack, _):
-    """
-    Use the channel archive event to delete the channel
-    from the ChannelManager
-    """
-    await slack.channels.get(event['channel'], fetch=True)
-
-
-async def channel_created(event, slack, _):
-    """
-    Use the channel created event to add the channel
-    to the ChannelManager
-    """
-    await slack.channels.get(event['channel']['id'], fetch=True)
-
-
-async def channel_deleted(event, slack, _):
-    """
-    Use the channel delete event to delete the channel
-    from the ChannelManager
-    """
-    await slack.channels.get(event['channel'], fetch=True)
-
-
-async def channel_joined(event, slack, _):
-    """
-    Use the channel joined event to update the channel status
-    """
-    await slack.channels.get(event['channel']['id'], fetch=True)
-
-
-async def channel_left(event, slack, _):
-    """
-    Use the channel left event to update the channel status
-    """
-    await slack.channels.get(event['channel'], fetch=True)
-
-
-async def channel_rename(event, slack, _):
-    """
-    User the channel rename event to update the name
-    of the channel
-    """
-    await slack.channels.get(event['channel']['id'], fetch=True)
-
-
-async def channel_unarchive(event, slack, _):
-    """
-    Use the channel unarchive event to delete the channel
-    from the ChannelManager
-    """
-    await slack.channels.get(event['channel'], fetch=True)
-
-
-@hookimpl
-def register_slack_events():
-    events = [
-        {
-            'event': 'channel_archive',
-            'func': channel_archive
-        },
-        {
-            'event': 'channel_created',
-            'func': channel_created
-        },
-        {
-            'event': 'channel_deleted',
-            'func': channel_deleted
-        },
-        {
-            'event': 'channel_joined',
-            'func': channel_joined
-        },
-        {
-            'event': 'channel_left',
-            'func': channel_left,
-        },
-        {
-            'event': 'channel_rename',
-            'func': channel_rename,
-        },
-        {
-            'event': 'channel_unarchive',
-            'func': channel_unarchive,
-
-        }
-    ]
-
-    return events
