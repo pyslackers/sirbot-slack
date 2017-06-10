@@ -1,18 +1,21 @@
-import logging
 import asyncio
 import inspect
-import time
 import json
+import logging
+import time
+from collections import defaultdict
 
 from aiohttp.web import Response
+from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
 from .. import database
-from collections import defaultdict
-from sirbot.utils import ensure_future
-
 
 logger = logging.getLogger(__name__)
+
+
+IGNORING = ['channel_join', 'channel_leave', 'bot_message']
+SUBTYPE_TO_EVENT = ['message_changed', 'message_deleted']
 
 
 class EventDispatcher(SlackDispatcher):
@@ -42,7 +45,7 @@ class EventDispatcher(SlackDispatcher):
 
         try:
             if event['type'] == 'message':
-                await self._message_dispatcher.incoming(event)
+                await self._incoming_message(event)
             else:
                 await self._incoming(event)
         except Exception as e:
@@ -61,7 +64,7 @@ class EventDispatcher(SlackDispatcher):
         try:
             if payload['event']['type'] == 'message':
                 ensure_future(
-                    self._message_dispatcher.incoming(payload['event']),
+                    self._incoming_message(payload['event']),
                     loop=self._loop,
                     logger=logger
                 )
@@ -75,6 +78,17 @@ class EventDispatcher(SlackDispatcher):
         except Exception as e:
             logger.exception(e)
             return Response(status=500)
+
+    async def _incoming_message(self, event):
+        subtype = event.get('subtype') or event.get('message', {}).get(
+            'subtype', 'message')
+        if subtype in IGNORING:
+            return
+        elif subtype in SUBTYPE_TO_EVENT:
+            event['type'] = subtype
+            await self._incoming(event)
+        else:
+            await self._message_dispatcher.incoming(event)
 
     async def _incoming(self, event):
         logger.debug('Event handler received: %s', event)

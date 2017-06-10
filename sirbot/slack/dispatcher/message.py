@@ -13,9 +13,6 @@ from ..store.message import SlackMessage
 
 logger = logging.getLogger(__name__)
 
-IGNORING = ['message_changed', 'message_deleted', 'channel_join',
-            'channel_leave', 'message_replied', 'bot_message']
-
 
 class MessageDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
@@ -55,9 +52,6 @@ class MessageDispatcher(SlackDispatcher):
 
         if not message.frm:  # Message without frm (i.e: slackbot)
             logger.debug('Ignoring message without frm')
-            return
-        elif message.subtype in IGNORING:
-            logger.debug('Ignoring %s subtype', msg.get('subtype'))
             return
 
         if isinstance(self._save, list) and message.subtype in self._save \
