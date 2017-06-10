@@ -57,8 +57,8 @@ class SlackMessage:
         return self.raw.get('thread_ts', self.timestamp)
 
     @thread.setter
-    def thread(self, _):
-        raise ValueError
+    def thread(self, thread_ts):
+        self.raw['thread_ts'] = thread_ts
 
     @property
     def thread_callback(self):
