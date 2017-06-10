@@ -1,7 +1,7 @@
 import logging
 
 from .store.user import User
-from .errors import SlackInactiveDispatcher
+from .errors import SlackInactiveDispatcher, SlackNoThread
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,10 @@ class SlackFacade:
         :param messages: Messages to send
         """
         for message in messages:
+            message.frm = self.bot
 
             if self.bot.type == 'rtm' and isinstance(message.to, User):
                 await self.users.ensure_dm(message.to)
-
-            message.frm = self.bot
 
             if message.response_url:
                 # Message with a response url are response to actions or slash
@@ -61,10 +60,6 @@ class SlackFacade:
             else:
                 data = message.serialize(type_='send', to=self.bot.type)
                 message.raw = await self._http_client.send(data=data)
-
-            if message.thread_callback:
-                logger.debug('Adding thread callback: %s', message.thread)
-                self._threads[message.thread] = message.thread_callback
 
     async def update(self, *messages):
         """
@@ -170,3 +165,10 @@ class SlackFacade:
                                                  admin)
         else:
             raise SlackInactiveDispatcher
+
+    def add_thread(self, message, func, user_id='all'):
+
+        if message.thread or message.timestamp:
+            self._threads[message.thread or message.timestamp][user_id] = func
+        else:
+            raise SlackNoThread()

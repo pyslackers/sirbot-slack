@@ -3,6 +3,8 @@ import logging
 import os
 import yaml
 
+from collections import defaultdict
+
 from sirbot.utils import merge_dict
 from sirbot.core import Plugin
 
@@ -51,7 +53,7 @@ class SirBotSlack(Plugin):
         self._messages = None
         self._pm = None
 
-        self._threads = dict()
+        self._threads = defaultdict(dict)
         self._dispatcher = dict()
         self._started = False
 
