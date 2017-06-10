@@ -58,3 +58,7 @@ class SlackUnknownCommand(SlackUnknownEndpoint):
 
     def __init__(self, command):
         self.command = command
+
+
+class SlackNoThread(SlackError):
+    """Message without ts or thread_ts"""

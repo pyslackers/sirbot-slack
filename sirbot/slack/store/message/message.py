@@ -28,8 +28,6 @@ class SlackMessage:
         self.content.text = text
         self.response_url = response_url
 
-        self._thread_callback = None
-
     @property
     def text(self):
         return self.content.text

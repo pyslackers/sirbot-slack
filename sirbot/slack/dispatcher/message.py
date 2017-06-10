@@ -115,12 +115,17 @@ class MessageDispatcher(SlackDispatcher):
         handlers = list()
 
         if msg.thread in self._threads:
-            if self._threads[msg.thread][1] is True\
-                    or msg.frm.id == self._threads[msg.thread][1]:
+            if msg.frm.id in self._threads[msg.thread]:
+                logger.debug('Located thread handler for "%s" and "%s"',
+                             msg.thread, msg.frm.id)
+                handlers.append((self._threads[msg.thread][msg.frm.id], None))
+                del self._threads[msg.thread][msg.frm.id]
+            elif 'all' in self._threads[msg.thread]:
                 logger.debug('Located thread handler for "%s"', msg.thread)
-                handlers.append((self._threads[msg.thread][0], ''))
-                del self._threads[msg.thread]
-        else:
+                handlers.append((self._threads[msg.thread]['all'], None))
+                del self._threads[msg.thread]['all']
+
+        if not handlers:
             for match, commands in self._endpoints.items():
                 n = match.search(msg.text)
                 if n:
