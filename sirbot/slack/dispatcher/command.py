@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import json
 import logging
 
 from aiohttp.web import Response
