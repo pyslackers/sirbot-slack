@@ -61,14 +61,14 @@ class CommandDispatcher(SlackDispatcher):
         coroutine = settings['func'](command, slack, facades)
         ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
-        if settings.get('public'):
-            return Response(
-                status=200,
-                body=json.dumps({"response_type": "in_channel"}),
-                content_type='application/json'
-            )
-        else:
-            return Response(status=200)
+        # if settings.get('public'):
+        #     return Response(
+        #         status=200,
+        #         body=json.dumps({"response_type": "in_channel"}),
+        #         content_type='application/json'
+        #     )
+        # else:
+        return Response(status=200)
 
     def register(self, command, func, public=False):
         logger.debug('Registering slash command: %s, %s from %s',
