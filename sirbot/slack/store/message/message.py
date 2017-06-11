@@ -16,7 +16,8 @@ class SlackMessage:
         if not raw:
             raw = dict()
 
-        self.to = to
+        self._to = to
+
         self.frm = frm
         self.mention = mention
         self.subtype = subtype
@@ -27,6 +28,16 @@ class SlackMessage:
         self.content = content or SlackContent()
         self.content.text = text
         self.response_url = response_url
+
+    @property
+    def to(self):
+        return self._to
+
+    @to.setter
+    def to(self, to):
+        if self.response_url:
+            self.response_url = None
+        self._to = to
 
     @property
     def text(self):

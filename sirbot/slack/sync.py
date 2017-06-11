@@ -77,21 +77,21 @@ async def group_archive(event, slack, _):
     Use the channel archive event to delete the channel
     from the ChannelManager
     """
-    await slack.groups.get(event['channel'], update=True)
+    await slack.groups.get(event['channel'], fetch=True)
 
 
 async def group_joined(event, slack, _):
     """
     Use the channel joined event to update the channel status
     """
-    await slack.groups.get(event['channel']['id'], update=True)
+    await slack.groups.get(event['channel']['id'], fetch=True)
 
 
 async def group_left(event, slack, _):
     """
     Use the channel left event to update the channel status
     """
-    await slack.groups.get(event['channel'], update=True)
+    await slack.groups.get(event['channel'], fetch=True)
 
 
 async def group_rename(event, slack, _):
@@ -99,7 +99,7 @@ async def group_rename(event, slack, _):
     User the channel rename event to update the name
     of the channel
     """
-    await slack.groups.get(event['channel']['id'], update=True)
+    await slack.groups.get(event['channel']['id'], fetch=True)
 
 
 async def group_unarchive(event, slack, _):
@@ -107,7 +107,7 @@ async def group_unarchive(event, slack, _):
     Use the channel unarchive event to delete the channel
     from the ChannelManager
     """
-    await slack.groups.get(event['channel'], update=True)
+    await slack.groups.get(event['channel'], fetch=True)
 
 
 async def user_typing(event, slack, _):
