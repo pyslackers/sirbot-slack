@@ -104,7 +104,7 @@ class UserStore(SlackStore):
             if user:
                 await self._add(user)
         if dm:
-            self.ensure_dm(user, db)
+            await self.ensure_dm(user, db)
 
         return user
 
