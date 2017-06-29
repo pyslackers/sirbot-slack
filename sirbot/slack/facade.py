@@ -88,40 +88,32 @@ class SlackFacade:
         for message in messages:
             message.timestamp = await self._http_client.delete(message)
 
-    async def add_reaction(self, *messages):
+    async def add_reaction(self, message, reaction):
         """
         Add a reaction to a message
 
         :Example:
 
-        >>> chat.add_reaction([Message, 'thumbsup'], [Message, 'robotface'])
+        >>> chat.add_reaction(Message, 'thumbsup')
         Add the thumbup and robotface reaction to the message
 
         :param messages: List of message and reaction to add
         """
-        for message, reaction in messages:
 
-            if message.to.id == self.bot.id:
-                message.to = message.frm
+        await self._http_client.add_reaction(message, reaction)
 
-            if isinstance(message.to, User):
-                await self.users.ensure_dm(message.to)
-
-            await self._http_client.add_reaction(message, reaction)
-
-    async def delete_reaction(self, *messages):
+    async def delete_reaction(self, message, reaction):
         """
         Delete reactions from messages
 
         :Example:
 
-        >>> chat.delete_reaction([Message, 'thumbsup'], [Message, 'robotface'])
+        >>> chat.delete_reaction(Message, 'thumbsup')
         Delete the thumbup and robotface reaction from the message
 
         :param messages: List of message and reaction to delete
         """
-        for message, reaction in messages:
-            await self._http_client.delete_reaction(message, reaction)
+        await self._http_client.delete_reaction(message, reaction)
 
     async def get_reactions(self, message):
         """

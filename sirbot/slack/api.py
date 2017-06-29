@@ -282,9 +282,10 @@ class HTTPClient(APICaller):
         :return: Formatted message
         :rtype: dict
         """
-        msg = message.serialize()
+        msg = dict()
+        msg['channel'] = message.to.send_id
         msg['name'] = reaction
-        msg['timestamp'] = msg['ts']
+        msg['timestamp'] = message.timestamp
         return msg
 
     async def get_channels(self, members=False, archived=False):

@@ -144,6 +144,7 @@ class SirBotSlack(Plugin):
                 plugins=self._pm,
                 facades=self._facades,
                 save=self._config['save']['messages'],
+                ping=self._config['ping'],
                 loop=self._loop,
                 threads=self._threads
             )

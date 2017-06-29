@@ -1,5 +1,6 @@
 slack:
   rtm: false
+  ping: "robot_face"
   save:
     messages: false
     events: false
