@@ -10,13 +10,14 @@ from sirbot.utils import ensure_future
 from .dispatcher import SlackDispatcher
 from .. import database
 from ..store.message import SlackMessage
+from ..store.channel import Channel
 
 logger = logging.getLogger(__name__)
 
 
 class MessageDispatcher(SlackDispatcher):
     def __init__(self, http_client, users, channels, groups, plugins, facades,
-                 threads, save, loop):
+                 threads, save, loop, ping):
 
         super().__init__(
             http_client=http_client,
@@ -32,6 +33,10 @@ class MessageDispatcher(SlackDispatcher):
         self.bot = None
         self._threads = threads
         self._endpoints = defaultdict(list)
+
+        if ping:
+            self._ping_emoji = ping
+            self.register(match='', func=self._ping, mention=True)
 
     async def incoming(self, msg):
         """
@@ -143,3 +148,8 @@ class MessageDispatcher(SlackDispatcher):
         for func in handlers:
             f = func[0](msg, slack_facade, facades, func[1])
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
+
+    async def _ping(self, message, slack, *_):
+
+        if isinstance(message.to, Channel):
+            await slack.add_reaction(message, self._ping_emoji)
