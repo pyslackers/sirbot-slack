@@ -233,7 +233,7 @@ class HTTPClient(APICaller):
         """
         msg = self._prepare_reaction(message, reaction)
         logger.debug('Reaction Add: %s', msg)
-        await self._do_post(APIPath.REACT_ADD, msg=msg)
+        await self._do_post(APIPath.REACT_ADD, msg=msg, token=self._bot_token)
 
     async def delete_reaction(self, message, reaction: str):
         """
