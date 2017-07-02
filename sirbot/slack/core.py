@@ -266,25 +266,20 @@ class SirBotSlack(Plugin):
                 self._dispatcher['event'].bot = self.bot
             self._started = True
 
-    async def _rtm_reconnect(self):
-        logger.warning('Trying to reconnect to slack')
-        try:
-            await self._rtm_client.connect()
-        except SlackClientError:
-            await asyncio.sleep(1, loop=self._loop)
-            await self._rtm_reconnect()
-
     async def _incoming_rtm(self, event):
-        msg_type = event.get('type', None)
+        try:
+            msg_type = event.get('type', None)
 
-        if msg_type == 'hello':
-            self._started = True
-        elif self.started:
-            if msg_type in ('team_migration_started', 'goodbye'):
-                logger.debug('Bot needs to reconnect')
-                await self._rtm_reconnect()
-            else:
-                await self._dispatcher['event'].incoming_rtm(event)
+            if msg_type == 'hello':
+                self._started = True
+            elif self.started:
+                if msg_type in ('team_migration_started', 'goodbye'):
+                    logger.debug('Bot needs to reconnect')
+                    await self._rtm_client.reconnect()
+                else:
+                    await self._dispatcher['event'].incoming_rtm(event)
+        except Exception as e:
+            logger.exception(e)
 
     async def database_update(self, metadata, db):
 
