@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import yaml
@@ -15,7 +14,7 @@ from .dispatcher import (EventDispatcher,
                          MessageDispatcher)
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
-from .errors import SlackClientError, SlackSetupError
+from .errors import SlackSetupError
 from .facade import SlackFacade
 from .store import ChannelStore, UserStore, GroupStore, MessageStore
 from .store.user import User

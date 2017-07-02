@@ -23,7 +23,7 @@ script:
 
 deploy:
   provider: script
-  script: curl -X POST http://readthedocs.org/build/sirbot-plugin-slack
+  script: curl -X POST http://readthedocs.org/build/sirbot-slack
   on:
     repo: pyslackers/sirbot-slack
     branch: master

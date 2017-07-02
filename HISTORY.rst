@@ -5,7 +5,7 @@ History
 2017-01-07
 ----------
 
-Split between Sir-bot-a-lot core and Slack plugin
+Separation of the slack plugin from the core of Sir-bot-a-lot
 
 2016-08-20
 ----------
