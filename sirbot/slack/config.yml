@@ -1,16 +1,16 @@
 slack:
-  rtm: false
-  ping: "robot_face"
-  save:
+  rtm: false          # Activate the RTM api
+  ping: "robot_face"  # Emoji the bot react with on mention (false to deactivate)
+  save:               # Activate savings to database
     messages: false
     events: false
     commands: false
     actions: false
-  refresh:
+  refresh:            # Maximum time between update of objects
     user: 3600
     channel: 3600
     group: 3600
-  endpoints:
+  endpoints:          # Webhook endpoint (ex: "/commands")
     commands: false
     actions: false
     events: false
