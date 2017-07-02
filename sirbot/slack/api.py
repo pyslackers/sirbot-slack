@@ -10,7 +10,8 @@ from .errors import (
     SlackConnectionError,
     SlackServerError,
     SlackRedirectionError,
-    SlackAPIError
+    SlackAPIError,
+    SlackClientError
 )
 
 logger = logging.getLogger(__name__)
@@ -430,6 +431,18 @@ class RTMClient(APICaller):
 
         return data
 
+    async def reconnect(self):
+        logger.warning('Trying to reconnect to slack')
+        try:
+            self._closed.set()
+            await self._ws.close()
+            await self.connect()
+        except SlackClientError:
+            await asyncio.sleep(1, loop=self._loop)
+            await self.reconnect()
+        except Exception as e:
+            logger.exception(e)
+
     async def connect(self, url=None):
         """
         Connect to the websocket stream and iterate over the messages
@@ -439,11 +452,12 @@ class RTMClient(APICaller):
         try:
             if not url:
                 url = (await self._negotiate_rtm_url())['url']
-            async with self._session.ws_connect(url) as ws:
-                async for data in ws:
+            async with self._session.ws_connect(url) as self._ws:
+                self._closed.clear()
+                async for data in self._ws:
                     if data.type == aiohttp.WSMsgType.TEXT:
                         if data.data == 'close cmd':
-                            await ws.close()
+                            await self._ws.close()
                             break
                         else:
                             msg = json.loads(data.data)
@@ -451,9 +465,11 @@ class RTMClient(APICaller):
                                           loop=self._loop,
                                           logger=logger)
                     elif data.type == aiohttp.WSMsgType.CLOSED:
-                        break
+                        logger.warning('WS CLOSED: %s', data)
                     elif data.type == aiohttp.WSMsgType.ERROR:
-                        break
+                        logger.warning('WS ERROR: %s', data)
+
+            await self.reconnect()
 
         except asyncio.CancelledError:
             pass
