@@ -2,6 +2,8 @@
 Configuration
 =============
 
+.. _authentification:
+
 Authentication
 --------------
 
@@ -28,12 +30,10 @@ The default slack part of the configuration file look like this:
 Plugins requirements
 --------------------
 
-Sirbot-slack needs the `sirbot-scheduler`_ and `sirbot-sqlite`_ plugins to
-work. They must be configured to start before sirbot-slack with the `priority`_
-key of the configuration file.
+Sirbot-slack needs the `sirbot-sqlite`_ plugin to work. it must be configured to
+start before sirbot-slack with the `priority`_ key of the configuration file.
 
 .. _sirbot-sqlite: https://github.com/pyslackers/sirbot-plugins
-.. _sirbot-scheduler: https://github.com/pyslackers/sirbot-plugins
 .. _priority: http://sir-bot-a-lot.readthedocs.io/en/latest/configuration.html#starting-priority
 
 Slack apps & Bot users
