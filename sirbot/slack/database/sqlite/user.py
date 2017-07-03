@@ -15,7 +15,7 @@ async def add(db, user):
 
 async def add_multiple(db, users):
     for user in users:
-        await add(db, users)
+        await add(db, user)
 
 
 async def delete(db, id_):
@@ -23,7 +23,10 @@ async def delete(db, id_):
 
 
 async def get_all(db):
-    pass
+    await db.execute('''SELECT slack_users''')
+    users = await db.fetchall()
+    return users
+
 
 
 async def find(db, id_):

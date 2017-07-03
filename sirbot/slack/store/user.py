@@ -74,7 +74,7 @@ class UserStore(SlackStore):
                 await database.__dict__[db.type].user.add(db, user)
                 if deleted:
                     users.append(user)
-                if not deleted and not user.deleted:
+                elif not deleted and not user.deleted:
                     users.append(user)
         else:
             data = await database.__dict__[db.type].user.get_all(
@@ -86,15 +86,7 @@ class UserStore(SlackStore):
                 dm_id=raw_data['dm_id'],
                 deleted=raw_data['deleted']
             ) for raw_data in data]
-        return [
-            User(
-                id_=raw_data['id'],
-                raw=raw_data['raw'],
-                last_update=raw_data['last_update'],
-                dm_id=raw_data['dm_id'],
-                deleted=raw_data['deleted']
-            ) for raw_data in data
-        ]
+        return users
 
     async def get(self, id_, fetch=False, dm=False):
         """
