@@ -10,8 +10,16 @@ async def add(db, user):
          (id, dm_id, admin, raw, last_update)
          VALUES (?, ?, ?, ?, ?)''',
         (user.id, user.dm_id, user.admin, json.dumps(user.raw),
-         user.last_update))
+         user.last_update, user.deleted))
 
+async def add_multiple(db, users):
+    for user in users:
+        await db.execute(
+            '''INSERT OR REPLACE INTO slack_users
+             (id, dm_id, admin, raw, last_update)
+             VALUES (?, ?, ?, ?, ?)''',
+            (user.id, user.dm_id, user.admin, json.dumps(user.raw),
+             user.last_update, user.deleted))    
 
 async def delete(db, id_):
     await db.execute('''DELETE FROM slack_users WHERE id = ? ''', (id_,))
