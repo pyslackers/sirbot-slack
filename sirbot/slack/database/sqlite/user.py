@@ -28,7 +28,6 @@ async def get_all(db):
     return users
 
 
-
 async def find(db, id_):
     await db.execute('''SELECT id, dm_id, raw, last_update FROM slack_users
                         WHERE id = ?''',
