@@ -13,13 +13,13 @@ It aims to provide full support of the slack API (Web, Events and RTM)
 to `Sir-bot-a-lot`_.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    quickstart
    installation
    configuration
-   utilisation
    contributing
+   tutorial/tutorial
    history
    authors
    license
