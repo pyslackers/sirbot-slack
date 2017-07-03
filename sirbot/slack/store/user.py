@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class User(SlackItem):
+
     def __init__(self, id_, raw=None, dm_id=None, last_update=None):
         """
         Class representing a slack user.
@@ -58,21 +59,40 @@ class UserStore(SlackStore):
 
     async def all(self, fetch=False, deleted=False):
         db = self._facades.get('database')
-        db_data = await database.__dict__[db.type].user.get_all(db)
         if fetch:
+            users = list()
             fetched_data = await self._client.get_users()
-            for user in fetched_data:
-                await database.__dict__[db.type].user.add_multiple(db, user)
-            data = fetched_data
+
+            for data in fetched_data:
+                user = User(
+                    id_=data['id'],
+                    raw=data['raw'],
+                    last_update=data['last_update'],
+                    dm_id=data['dm_id'],
+                    deleted=data['deleted'])
+
+                await database.__dict__[db.type].user.add(db, user)
+                if deleted:
+                    users.append(user)
+                if not deleted and not user.deleted:
+                    users.append(user)
         else:
-            data = db_data
+            data = await database.__dict__[db.type].user.get_all(
+                db, deleted=deleted)
+            users = [User(
+                id_=raw_data['id'],
+                raw=raw_data['raw'],
+                last_update=raw_data['last_update'],
+                dm_id=raw_data['dm_id'],
+                deleted=raw_data['deleted']
+            ) for raw_data in data]
         return [
             User(
                 id_=raw_data['id'],
                 raw=raw_data['raw'],
                 last_update=raw_data['last_update'],
-                dm_id=raw_data['dm_id']
-                deleted=raw['deleted']
+                dm_id=raw_data['dm_id'],
+                deleted=raw_data['deleted']
             ) for raw_data in data
         ]
 
@@ -105,7 +125,6 @@ class UserStore(SlackStore):
                 raw=json.loads(data['raw']),
                 dm_id=data['dm_id'],
                 last_update=data['last_update']
-                deleted=data['deleted']
             )
         else:
             user = await self._query(id_)
@@ -127,18 +146,6 @@ class UserStore(SlackStore):
             db = self._facades.get('database')
 
         await database.__dict__[db.type].user.add(db, user)
-        await db.commit()
-
-    async def _add_multiple(self, users, db=None):
-       """
-       Add Multiple users to the UserManager
-
-       :param users: list of users to Add
-       """
-        if not db:
-            db = self._facades.get('database')
-        for user in users:
-            await database.__dict__[db.type].user.add(db, user)
         await db.commit()
 
     async def _delete(self, id_, db=None):
@@ -166,7 +173,6 @@ class UserStore(SlackStore):
             raw=raw,
             last_update=time.time(),
             dm_id=dm_id
-            deleted=deleted
         )
 
         return user
