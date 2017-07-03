@@ -56,16 +56,23 @@ class UserStore(SlackStore):
     def __init__(self, client, facades, refresh=3600):
         super().__init__(client, facades, refresh)
 
-    async def all(self):
+    async def all(self, fetch=False, deleted=False):
         db = self._facades.get('database')
-        data = await database.__dict__[db.type].user.get_all(db)
-
+        db_data = await database.__dict__[db.type].user.get_all(db)
+        if fetch:
+            fetched_data = await self._client.get_users()
+            for user in fetched_data:
+                await database.__dict__[db.type].user.add_multiple(db, user)
+            data = fetched_data
+        else:
+            data = db_data
         return [
             User(
                 id_=raw_data['id'],
                 raw=raw_data['raw'],
                 last_update=raw_data['last_update'],
                 dm_id=raw_data['dm_id']
+                deleted=raw['deleted']
             ) for raw_data in data
         ]
 
@@ -98,6 +105,7 @@ class UserStore(SlackStore):
                 raw=json.loads(data['raw']),
                 dm_id=data['dm_id'],
                 last_update=data['last_update']
+                deleted=data['deleted']
             )
         else:
             user = await self._query(id_)
@@ -119,6 +127,18 @@ class UserStore(SlackStore):
             db = self._facades.get('database')
 
         await database.__dict__[db.type].user.add(db, user)
+        await db.commit()
+
+    async def _add_multiple(self, users, db=None):
+       """
+       Add Multiple users to the UserManager
+
+       :param users: list of users to Add
+       """
+        if not db:
+            db = self._facades.get('database')
+        for user in users:
+            await database.__dict__[db.type].user.add(db, user)
         await db.commit()
 
     async def _delete(self, id_, db=None):
@@ -146,6 +166,7 @@ class UserStore(SlackStore):
             raw=raw,
             last_update=time.time(),
             dm_id=dm_id
+            deleted=deleted
         )
 
         return user
