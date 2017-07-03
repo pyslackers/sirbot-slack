@@ -23,7 +23,8 @@ async def delete(db, id_):
 
 
 async def get_all(db):
-    await db.execute('''SELECT slack_users''')
+    await db.execute('''SELECT id, dm_id, raw, last_update, deleted FROM
+        slack_users''')
     users = await db.fetchall()
     return users
 
