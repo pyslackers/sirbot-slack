@@ -33,13 +33,13 @@ Once you have a copy of the source, you can install it with:
 Configuration
 -------------
 
-The default sirbot-slack part of the config file look like this:
+The default slack part of the configuration file look like this:
 
 .. literalinclude:: ../sirbot/slack/config.yml
 
 
-Environment variables
-*********************
+Authentication
+**************
 
 Slack connection information are provided as environment variables:
 
