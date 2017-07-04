@@ -50,16 +50,16 @@ class SlackFacade:
                 )
             elif isinstance(message.to, User) and self.bot.type == 'rtm':
                 data = message.serialize(type_='send', to=self.bot.type)
-                message.raw = await self._http_client.send(
+                message.raw = await self._http_client.message_send(
                     data=data,
                     token='bot'
                 )
             elif isinstance(message.to, User) and self.bot.type == 'event':
                 data = message.serialize(type_='send', to=self.bot.type)
-                message.raw = await self._http_client.send(data=data)
+                message.raw = await self._http_client.message_send(data=data)
             else:
                 data = message.serialize(type_='send', to=self.bot.type)
-                message.raw = await self._http_client.send(data=data)
+                message.raw = await self._http_client.message_send(data=data)
 
     async def update(self, *messages):
         """
@@ -74,7 +74,8 @@ class SlackFacade:
 
             message.frm = self.bot
             message.subtype = 'message_changed'
-            message.raw = await self._http_client.update(message=message)
+            message.raw = await self._http_client.message_update(
+                message=message)
             message.ts = message.raw.get('ts')
 
             # await self._save_outgoing_message(message)
@@ -86,7 +87,7 @@ class SlackFacade:
         :param messages: Messages to delete
         """
         for message in messages:
-            message.timestamp = await self._http_client.delete(message)
+            message.timestamp = await self._http_client.message_delete(message)
 
     async def add_reaction(self, message, reaction):
         """

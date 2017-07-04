@@ -138,9 +138,9 @@ class UserStore(SlackStore):
     async def _query(self, id_, dm_id=None):
 
         if id_.startswith('B'):
-            raw = await self._client.get_bot_info(id_)
+            raw = await self._client.get_bot(id_)
         else:
-            raw = await self._client.get_user_info(id_)
+            raw = await self._client.get_user(id_)
         user = User(
             id_=id_,
             raw=raw,
@@ -156,7 +156,7 @@ class UserStore(SlackStore):
             if not db:
                 db = self._facades.get('database')
 
-            user.dm_id = await self._client.get_user_dm_channel(user.id)
+            user.dm_id = await self._client.open_dm(user.id)
             await database.__dict__[db.type].user.update_dm_id(
                 db, user.id, user.dm_id)
             await db.commit()
