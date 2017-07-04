@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 class User(SlackItem):
 
-    def __init__(self, id_, raw=None, dm_id=None, last_update=None):
+    def __init__(self, id_, raw=None, dm_id=None, last_update=None,
+                 deleted=False):
         """
         Class representing a slack user.
 
@@ -19,6 +20,7 @@ class User(SlackItem):
 
         super().__init__(id_, raw, last_update)
         self.dm_id = dm_id
+        self.deleted = deleted
 
     @property
     def admin(self):
@@ -59,6 +61,7 @@ class UserStore(SlackStore):
 
     async def all(self, fetch=False, deleted=False):
         db = self._facades.get('database')
+
         if fetch:
             users = list()
             fetched_data = await self._client.get_users()
@@ -69,7 +72,8 @@ class UserStore(SlackStore):
                     raw=data['raw'],
                     last_update=data['last_update'],
                     dm_id=data['dm_id'],
-                    deleted=data['deleted'])
+                    deleted=data['deleted']
+                )
 
                 await database.__dict__[db.type].user.add(db, user)
                 if deleted:
@@ -86,6 +90,7 @@ class UserStore(SlackStore):
                 dm_id=raw_data['dm_id'],
                 deleted=raw_data['deleted']
             ) for raw_data in data]
+
         return users
 
     async def get(self, id_, fetch=False, dm=False):
@@ -116,7 +121,8 @@ class UserStore(SlackStore):
                 id_=id_,
                 raw=json.loads(data['raw']),
                 dm_id=data['dm_id'],
-                last_update=data['last_update']
+                last_update=data['last_update'],
+                deleted=data['deleted']
             )
         else:
             user = await self._query(id_)
@@ -164,7 +170,8 @@ class UserStore(SlackStore):
             id_=id_,
             raw=raw,
             last_update=time.time(),
-            dm_id=dm_id
+            dm_id=dm_id,
+            deleted=raw['deleted']
         )
 
         return user

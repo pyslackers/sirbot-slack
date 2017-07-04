@@ -22,9 +22,13 @@ async def delete(db, id_):
     await db.execute('''DELETE FROM slack_users WHERE id = ? ''', (id_,))
 
 
-async def get_all(db):
-    await db.execute('''SELECT id, dm_id, raw, last_update, deleted FROM
-        slack_users''')
+async def get_all(db, deleted=False):
+    filter_ = ''
+    if not deleted:
+        filter_ = 'WHERE deleted=0'
+
+    await db.execute('''SELECT * FROM slack_users {filter}'''.format(
+        filter=filter_))
     users = await db.fetchall()
     return users
 
