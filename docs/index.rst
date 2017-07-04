@@ -12,14 +12,19 @@ Sirbot-slack is a slack plugin for `Sir-bot-a-lot`_.
 It aims to provide full support of the slack API (Web, Events and RTM)
 to `Sir-bot-a-lot`_.
 
+.. note::
+
+   Tutorials for creating slack bot and slack app are available in the
+   :ref:`tutorial` section.
+
 .. toctree::
    :maxdepth: 2
 
    quickstart
    installation
    configuration
-   contributing
    tutorial/tutorial
+   contributing
    history
    authors
    license
