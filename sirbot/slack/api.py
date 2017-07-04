@@ -157,7 +157,7 @@ class HTTPClient(APICaller):
     :param loop: Event loop, optional
     """
 
-    async def delete(self, message):
+    async def message_delete(self, message):
         """
         Delete a previously sent message
 
@@ -170,7 +170,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.MSG_DELETE, msg=message)
         return rep.get('ts')
 
-    async def send(self, data, token='app'):
+    async def message_send(self, data, token='app'):
         """
         Send a new message
 
@@ -201,7 +201,7 @@ class HTTPClient(APICaller):
         rep = await self._do_json(url, msg=data)
         return rep
 
-    async def update(self, message):
+    async def message_update(self, message):
         """
         Update a previously sent message
 
@@ -261,19 +261,6 @@ class HTTPClient(APICaller):
         logger.debug('Reaction Get: {}'.format(msg))
         rep = await self._do_post(APIPath.REACT_GET, msg=msg)
         return rep.get('message').get('reactions')
-
-    def _prepare_message(self, message, timestamp: str = None):
-        """
-        Format the message for the Slack API
-        :param message: Message to send/update/delete
-        :param timestamp: Timestamp of the message
-        :return: Formatted msg
-        :rtype: dict
-        """
-        msg = message.serialize()
-        if timestamp:
-            msg['ts'] = timestamp
-        return msg
 
     def _prepare_reaction(self, message, reaction: str = ''):
         """
@@ -343,7 +330,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.USER_LIST)
         return rep['members']
 
-    async def get_user_info(self, user_id: str):
+    async def get_user(self, user_id: str):
         """
         Query the information about an user
 
@@ -358,7 +345,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.USER_INFO, msg=msg)
         return rep['user']
 
-    async def get_user_dm_channel(self, user_id: str):
+    async def open_dm(self, user_id: str):
         """
         Query the id of the direct message channel for an user
 
@@ -384,7 +371,7 @@ class HTTPClient(APICaller):
         rep = await self._do_post(APIPath.IM_LIST, token=self._bot_token)
         return rep
 
-    async def get_bot_info(self, bot=None):
+    async def get_bot(self, bot=None):
 
         rep = await self._do_post(APIPath.BOT_INFO, msg={'bot': bot})
         return rep['bot']
