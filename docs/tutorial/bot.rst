@@ -1,19 +1,20 @@
-=========
-Bot users
-=========
+==================
+Bot users tutorial
+==================
 
 Create the bot
 --------------
 
-To create your bot users go to this `page`_ and enter your bot username. Once this
-is done you will be provided with an ``API Token`` (starting with ``xoxb``).
+First we need a bot user to create one go to this `page`_ and enter your bot
+username. Once this is done you will be provided with an ``API Token``
+(starting with ``xoxb``).
 
 This is your :ref:`authentification` token.
 
 .. _page: ://my.slack.com/services/new/bot
 
-Install Sir-bot-a-lot
----------------------
+Installation
+------------
 
 Next step will be to install `Sir-bot-a-lot`_ in your virtual environment.
 First download all the necessary packages.
@@ -44,9 +45,9 @@ easiest way to set it is:
 
     $ export SIRBOT_SLACK_BOT_TOKEN=xoxb-0123456789
 
-Except the tokens all configuration takes place in the configuration file. It
-can be located anywhere in your file system and you need to pass the path as
-the ``--config`` argument when starting `Sir-bot-a-lot`.
+Except the tokens all configuration takes place in the yaml configuration file.
+It can be located from anywhere in your file system you only need to pass the
+path as the ``--config`` argument when starting `Sir-bot-a-lot`_.
 
 .. code-block:: yaml
 
@@ -67,7 +68,7 @@ Now that we have configured `Sir-bot-a-lot`_ we can start it with:
 
 .. code-block:: console
 
-    $ sirbot -c path/to/configuration/file
+    (.env) $ sirbot -c path/to/configuration/file
 
 You should now see some logs in your terminal and hopefully the presence status
 of your bot will turn green. By default your bot will react to mention
@@ -78,7 +79,7 @@ Responding to message
 
 In order to customize the behavior of your bot you need to write your very own
 plugin. You can look at the one for the `python developers slack community`_
-plugin over `here`_.
+over `here`_.
 
 For that create a new file named ``my_awesome_plugin.py`` with this small
 example plugin that respond ``I'm alive!`` when someone send the message
@@ -158,5 +159,15 @@ this we will add the following snippet at the end:
 You are now the proud possessor of an awesome slack bot !
 
 .. _Sir-bot-a-lot: http://sir-bot-a-lot.readthedocs.io/en/latest/
-.. _python developers slack community: https://pythondev.slack.com/
 .. _here: https://github.com/pyslackers/sirbot-pythondev
+
+Help
+----
+
+For additionnal help you can `open an issue`_ or join us in the
+``community_projects`` channel of the `python developers slack community`_.
+Want to join? `Get an invite`_ !
+
+.. _open an issue: https://github.com/pyslackers/sirbot-slack/issues
+.. _Get an invite: http://pyslackers.com/
+.. _python developers slack community: https://pythondev.slack.com/
