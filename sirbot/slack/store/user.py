@@ -60,26 +60,34 @@ class UserStore(SlackStore):
         super().__init__(client, facades, refresh)
 
     async def all(self, fetch=False, deleted=False):
+        """
+        Retrieve all user of the slack team
+
+        When fetch is True no dm_id are provided
+
+        :param fetch:
+        :param deleted:
+        :return:
+        """
         db = self._facades.get('database')
 
         if fetch:
             users = list()
             fetched_data = await self._client.get_users()
-
             for data in fetched_data:
                 user = User(
                     id_=data['id'],
-                    raw=data['raw'],
-                    last_update=data['last_update'],
-                    dm_id=data['dm_id'],
+                    raw=data,
+                    last_update=time.time(),
                     deleted=data['deleted']
                 )
 
-                await database.__dict__[db.type].user.add(db, user)
+                await database.__dict__[db.type].user.add(db, user, dm_id=False)
                 if deleted:
                     users.append(user)
                 elif not deleted and not user.deleted:
                     users.append(user)
+            await db.commit()
         else:
             data = await database.__dict__[db.type].user.get_all(
                 db, deleted=deleted)

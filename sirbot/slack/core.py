@@ -290,6 +290,10 @@ class SirBotSlack(Plugin):
             await database.__dict__[db.type].update.update_007(db)
             metadata['version'] = '0.0.7'
 
+        if metadata['version'] == '0.0.7':
+            await database.__dict__[db.type].update.update_008(db)
+            metadata['version'] = '0.0.8'
+
         return self.__version__
 
     async def _create_db_table(self):

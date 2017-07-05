@@ -66,22 +66,6 @@ async def update_007(db):
     await db.execute('''DROP TABLE slack_messages_tmp''')
 
 async def update_008(db):
-    await db.execute('''ALTER TABLE slack_users
-                        RENAME TO slack_users_tmp''')
 
-    await db.execute('''CREATE TABLE IF NOT EXISTS slack_users (
-    id TEXT PRIMARY KEY NOT NULL,
-    dm_id TEXT,
-    admin BOOLEAN DEFAULT FALSE,
-    raw TEXT,
-    last_update REAL,
-    deleted BOOLEAN DEFAULT FALSE
-    )
-    ''')
-
-    await db.execute('''INSERT INTO slack_users
-                        (id, dm_id, admin, raw, last_update, deleted)
-                        SELECT id, dm_id, admin, raw, last_update, FALSE
-                        FROM slack_users_tmp''')
-
-    await db.execute('''DROP TABLE slack_users_tmp''')
+    await db.execute('''ALTER TABLE slack_users ADD
+                        deleted BOOLEAN DEFAULT FALSE''')
