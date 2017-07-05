@@ -7,10 +7,15 @@ logger = logging.getLogger(__name__)
 async def add(db, user):
     await db.execute(
         '''INSERT OR REPLACE INTO slack_users
-         (id, dm_id, admin, raw, last_update)
-         VALUES (?, ?, ?, ?, ?)''',
+         (id, dm_id, admin, raw, last_update, deleted)
+         VALUES (?, ?, ?, ?, ?, ?)''',
         (user.id, user.dm_id, user.admin, json.dumps(user.raw),
-         user.last_update))
+         user.last_update, user.deleted))
+
+
+async def add_multiple(db, users):
+    for user in users:
+        await add(db, user)
 
 
 async def delete(db, id_):
@@ -18,7 +23,10 @@ async def delete(db, id_):
 
 
 async def get_all(db):
-    pass
+    await db.execute('''SELECT id, dm_id, raw, last_update, deleted FROM
+        slack_users''')
+    users = await db.fetchall()
+    return users
 
 
 async def find(db, id_):

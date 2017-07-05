@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class User(SlackItem):
+
     def __init__(self, id_, raw=None, dm_id=None, last_update=None):
         """
         Class representing a slack user.
@@ -56,18 +57,36 @@ class UserStore(SlackStore):
     def __init__(self, client, facades, refresh=3600):
         super().__init__(client, facades, refresh)
 
-    async def all(self):
+    async def all(self, fetch=False, deleted=False):
         db = self._facades.get('database')
-        data = await database.__dict__[db.type].user.get_all(db)
+        if fetch:
+            users = list()
+            fetched_data = await self._client.get_users()
 
-        return [
-            User(
+            for data in fetched_data:
+                user = User(
+                    id_=data['id'],
+                    raw=data['raw'],
+                    last_update=data['last_update'],
+                    dm_id=data['dm_id'],
+                    deleted=data['deleted'])
+
+                await database.__dict__[db.type].user.add(db, user)
+                if deleted:
+                    users.append(user)
+                elif not deleted and not user.deleted:
+                    users.append(user)
+        else:
+            data = await database.__dict__[db.type].user.get_all(
+                db, deleted=deleted)
+            users = [User(
                 id_=raw_data['id'],
                 raw=raw_data['raw'],
                 last_update=raw_data['last_update'],
-                dm_id=raw_data['dm_id']
-            ) for raw_data in data
-        ]
+                dm_id=raw_data['dm_id'],
+                deleted=raw_data['deleted']
+            ) for raw_data in data]
+        return users
 
     async def get(self, id_, fetch=False, dm=False):
         """
