@@ -7,18 +7,16 @@
 Welcome to sirbot-slack documentation!
 ======================================
 
-Sirbot-slack is a slack plugin for `Sir-bot-a-lot`_.
-
-It aims to provide full support of the slack API (Web, Events and RTM)
-to `Sir-bot-a-lot`_.
+Sirbot-slack is a slack plugin for `Sir-bot-a-lot`_. It aims to provide full
+support for the slack API (Web, Events and RTM).
 
 The uses of bots are nearly endless and come in all shapes and sizes.
 They can handle Slack shenanigans, monitor the status of a crypto-currency,
 or become your personal assistant. Sir-bot-a-lot can help you get started
 writing your own.
 
-Sir-bot-a-lot is a project maintained by the `pyslackers`_ community.
-Want to join? `Get an invite`_ !
+Sir-bot-a-lot and sirbot-slack are projects maintained by the `pyslackers`_
+community. Want to join? `Get an invite`_ !
 
 .. note::
 
