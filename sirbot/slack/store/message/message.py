@@ -28,6 +28,7 @@ class SlackMessage:
         self.content = content or SlackContent()
         self.content.text = text
         self.response_url = response_url
+        self._thread_callback = (None, None)
 
     @property
     def to(self):
@@ -85,7 +86,6 @@ class SlackMessage:
 
         if not asyncio.iscoroutine(func):
             func = asyncio.coroutine(func)
-
         self._thread_callback = (func, user_id)
 
     def serialize(self, type_='send', to='rtm'):

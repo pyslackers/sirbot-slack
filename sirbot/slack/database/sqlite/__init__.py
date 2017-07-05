@@ -9,7 +9,8 @@ async def create_table(db):
     dm_id TEXT,
     admin BOOLEAN DEFAULT FALSE,
     raw TEXT,
-    last_update REAL
+    last_update REAL,
+    deleted BOOLEAN DEFAULT FALSE
     )
     ''')
 

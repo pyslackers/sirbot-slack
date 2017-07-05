@@ -12,9 +12,9 @@ DATA = {
     "description": 'Slack plugin for the good Sir Bot a lot',
     "license": 'MIT',
     "name": 'sirbot.slack',
-    "url": 'https://gitlab.com/PythonDevCommunity/sirbot-plugin-slack',
+    "url": 'https://github.com/pyslackers/sirbot-slack/',
     # Versions should comply with PEP440. For a discussion on
     # single-sourcing the version across setup.py and the project code,
     # see http://packaging.python.org/en/latest/tutorial.html#version
-    "version": '0.0.7',
+    "version": '0.0.8',
 }

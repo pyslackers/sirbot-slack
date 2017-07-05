@@ -11,7 +11,7 @@ username. Once this is done you will be provided with an ``API Token``
 
 This is your :ref:`authentification` token.
 
-.. _page: ://my.slack.com/services/new/bot
+.. _page: https://my.slack.com/services/new/bot
 
 Installation
 ------------
