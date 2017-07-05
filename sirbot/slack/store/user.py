@@ -82,7 +82,8 @@ class UserStore(SlackStore):
                     deleted=data['deleted']
                 )
 
-                await database.__dict__[db.type].user.add(db, user, dm_id=False)
+                await database.__dict__[db.type].user.add(db, user,
+                                                          dm_id=False)
                 if deleted:
                     users.append(user)
                 elif not deleted and not user.deleted:

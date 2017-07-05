@@ -65,6 +65,7 @@ async def update_007(db):
 
     await db.execute('''DROP TABLE slack_messages_tmp''')
 
+
 async def update_008(db):
 
     await db.execute('''ALTER TABLE slack_users ADD
