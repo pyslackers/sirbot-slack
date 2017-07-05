@@ -12,6 +12,14 @@ Sirbot-slack is a slack plugin for `Sir-bot-a-lot`_.
 It aims to provide full support of the slack API (Web, Events and RTM)
 to `Sir-bot-a-lot`_.
 
+The uses of bots are nearly endless and come in all shapes and sizes.
+They can handle Slack shenanigans, monitor the status of a crypto-currency,
+or become your personal assistant. Sir-bot-a-lot can help you get started
+writing your own.
+
+Sir-bot-a-lot is a project maintained by the `pyslackers`_ community.
+Want to join? `Get an invite`_ !
+
 .. note::
 
    Tutorials for creating slack bot and slack app are available in the
@@ -30,5 +38,5 @@ to `Sir-bot-a-lot`_.
    license
 
 .. _Sir-bot-a-lot: http://sir-bot-a-lot.readthedocs.io/en/latest/
-.. _Get an invite: http://pythondevelopers.herokuapp.com/
-.. _python developers slack community: https://pythondev.slack.com/
+.. _pyslackers: http://pyslackers.com
+.. _Get an invite: http://pyslackers.com

@@ -4,24 +4,33 @@
 
 |build| |doc|
 
-`Sir-bot-a-lot`_ slack plugin built for the people and by the people of the `python developers slack community`_.
+Sirbot-slack is a slack plugin for `Sir-bot-a-lot`_.
 
+It aims to provide full support of the slack API (Web, Events and RTM)
+to `Sir-bot-a-lot`_.
+
+The uses of bots are nearly endless and come in all shapes and sizes.
+They can handle Slack shenanigans, monitor the status of a crypto-currency,
+or become your personal assistant. Sir-bot-a-lot can help you get started
+writing your own.
+
+Sir-bot-a-lot is a project maintained by the `pyslackers`_ community.
 Want to join? `Get an invite`_ !
 
-.. _Get an invite: http://pythondevelopers.herokuapp.com/
-.. _python developers slack community: https://pythondev.slack.com/
+.. _pyslackers: http://pyslackers.com
+.. _Get an invite: http://pyslackers.com
 .. |build| image:: https://travis-ci.org/pyslackers/sirbot-slack.svg?branch=master
     :alt: Build status
     :target: https://travis-ci.org/pyslackers/sirbot-slack
-.. |doc| image:: https://readthedocs.org/projects/sirbot-plugin-slack/badge/?version=latest
+.. |doc| image:: https://readthedocs.org/projects/sirbot-slack/badge/?version=latest
     :alt: Documentation status
-    :target: http://sirbot-plugin-slack.readthedocs.io/en/latest/
+    :target: http://sirbot-slack.readthedocs.io/en/latest/
 .. |icon| image:: icon/icon-500.png
     :width: 10%
     :alt: Sir-bot-a-lot slack plugin icon
-    :target: http://sirbot-plugin-slack.readthedocs.io/en/latest/
+    :target: http://sirbot-slack.readthedocs.io/en/latest/
 
-.. _sir-bot-a-lot: http://sir-bot-a-lot.readthedocs.io/en/latest/
+.. _sir-bot-a-lot: https://github.com/pyslackers/sir-bot-a-lot
 
 Documentation available `here`_
 
