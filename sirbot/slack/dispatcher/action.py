@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ActionDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, facades,
+    def __init__(self, http_client, users, channels, groups, plugins, registry,
                  save, loop, token):
 
         super().__init__(
@@ -24,7 +24,7 @@ class ActionDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            facades=facades,
+            registry=registry,
             save=save,
             loop=loop
         )
@@ -44,8 +44,7 @@ class ActionDispatcher(SlackDispatcher):
 
         logger.debug('Action handler received: %s', payload)
 
-        facades = self._facades.new()
-        slack = facades.get('slack')
+        slack = self._registry.get('slack')
         settings = self._endpoints.get(payload['callback_id'])
 
         if not settings:
@@ -58,12 +57,12 @@ class ActionDispatcher(SlackDispatcher):
             logger.debug('Saving incoming action %s from %s',
                          action.callback_id,
                          action.frm.id)
-            db = facades.get('database')
+            db = self._registry.get('database')
             await database.__dict__[db.type].dispatcher.save_incoming_action(
                 db, action)
             await db.commit()
 
-        coroutine = settings['func'](action, slack, facades)
+        coroutine = settings['func'](action, slack, self._registry)
         ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
         if settings.get('public'):

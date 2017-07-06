@@ -15,9 +15,9 @@ from .dispatcher import (EventDispatcher,
 from .__meta__ import DATA as METADATA
 from .api import RTMClient, HTTPClient
 from .errors import SlackSetupError
-from .facade import SlackFacade
 from .store import ChannelStore, UserStore, GroupStore, MessageStore
 from .store.user import User
+from .wrapper import SlackWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,6 @@ SUPPORTED_DATABASE = ['sqlite']
 class SirBotSlack(Plugin):
     __name__ = 'slack'
     __version__ = METADATA['version']
-    __facade__ = 'slack'
 
     def __init__(self, loop):
         super().__init__(loop)
@@ -39,7 +38,7 @@ class SirBotSlack(Plugin):
         self._loop = loop
         self._router = None
         self._config = None
-        self._facades = None
+        self._registry = None
         self._session = None
         self._bot_token = None
         self._app_token = None
@@ -62,7 +61,7 @@ class SirBotSlack(Plugin):
     def started(self):
         return self._started
 
-    async def configure(self, config, router, session, facades):
+    async def configure(self, config, router, session, registry):
         logger.debug('Configuring slack plugin')
         path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), 'config.yml'
@@ -75,7 +74,7 @@ class SirBotSlack(Plugin):
 
         self._router = router
         self._session = session
-        self._facades = facades
+        self._registry = registry
 
         self._bot_token = os.environ.get('SIRBOT_SLACK_BOT_TOKEN', '')
         self._app_token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
@@ -83,8 +82,8 @@ class SirBotSlack(Plugin):
             'SIRBOT_SLACK_VERIFICATION_TOKEN'
         )
 
-        if 'database' not in self._facades:
-            raise SlackSetupError('A database facades is required')
+        if 'database' not in self._registry:
+            raise SlackSetupError('A database is required')
 
         if not self._bot_token and not self._app_token:
             raise SlackSetupError(
@@ -110,25 +109,25 @@ class SirBotSlack(Plugin):
 
         self._users = UserStore(
             client=self._http_client,
-            facades=self._facades,
+            registry=self._registry,
             refresh=self._config['refresh']['user']
         )
 
         self._channels = ChannelStore(
             client=self._http_client,
-            facades=self._facades,
+            registry=self._registry,
             refresh=self._config['refresh']['channel']
         )
 
         self._groups = GroupStore(
             client=self._http_client,
-            facades=self._facades,
+            registry=self._registry,
             refresh=self._config['refresh']['group']
         )
 
         self._messages = MessageStore(
             client=self._http_client,
-            facades=self._facades
+            registry=self._registry
         )
 
         if self._config['rtm'] or self._config['endpoints']['events']:
@@ -141,7 +140,7 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                facades=self._facades,
+                registry=self._registry,
                 save=self._config['save']['messages'],
                 ping=self._config['ping'],
                 loop=self._loop,
@@ -154,7 +153,7 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                facades=self._facades,
+                registry=self._registry,
                 loop=self._loop,
                 message_dispatcher=self._dispatcher['message'],
                 event_save=self._config['save']['events'],
@@ -185,7 +184,7 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                facades=self._facades,
+                registry=self._registry,
                 loop=self._loop,
                 save=self._config['save']['actions'],
                 token=self._verification_token
@@ -206,7 +205,7 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                facades=self._facades,
+                registry=self._registry,
                 loop=self._loop,
                 save=self._config['save']['commands'],
                 token=self._verification_token
@@ -217,21 +216,21 @@ class SirBotSlack(Plugin):
                 self._dispatcher['command'].incoming
             )
 
-    def facade(self):
+    def factory(self):
         """
-        Initialize and return a new facade
+        Initialize and return the slack wrapper
 
         This is called by the core when a for each incoming message and when
-        another plugin request a slack facade
+        another plugin request the slack wrapper
         """
-        return SlackFacade(
+        return SlackWrapper(
             http_client=self._http_client,
             users=self._users,
             channels=self._channels,
             groups=self._groups,
             messages=self._messages,
             bot=self.bot,
-            facades=self._facades,
+            registry=self._registry,
             threads=self._threads,
             dispatcher=self._dispatcher
         )
@@ -239,14 +238,14 @@ class SirBotSlack(Plugin):
     async def start(self):
         logger.debug('Starting slack plugin')
 
-        db = self._facades.get('database')
+        db = self._registry.get('database')
         if db.type not in SUPPORTED_DATABASE:
             raise SlackSetupError('Database must be one of %s',
                                   ', '.join(SUPPORTED_DATABASE))
 
         await self._create_db_table()
 
-        slack = self.facade()
+        slack = self.factory()
         sync.add_to_slack(slack)
 
         if self._rtm_client:
@@ -297,7 +296,7 @@ class SirBotSlack(Plugin):
         return self.__version__
 
     async def _create_db_table(self):
-        db = self._facades.get('database')
+        db = self._registry.get('database')
         await database.__dict__[db.type].create_table(db)
         await db.set_plugin_metadata(self)
         await db.commit()

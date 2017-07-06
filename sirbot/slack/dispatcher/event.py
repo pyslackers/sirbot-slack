@@ -19,7 +19,7 @@ SUBTYPE_TO_EVENT = ['message_changed', 'message_deleted']
 
 
 class EventDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, facades,
+    def __init__(self, http_client, users, channels, groups, plugins, registry,
                  event_save, message_dispatcher, loop, token):
 
         super().__init__(
@@ -28,7 +28,7 @@ class EventDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            facades=facades,
+            registry=registry,
             save=event_save,
             loop=loop
         )
@@ -93,16 +93,15 @@ class EventDispatcher(SlackDispatcher):
     async def _incoming(self, event):
         logger.debug('Event handler received: %s', event)
 
-        facades = self._facades.new()
-        slack = facades.get('slack')
+        slack = self._registry.get('slack')
 
         if isinstance(self._save, list) and event['type'] in self._save \
                 or self._save is True:
-            db = facades.get('database')
+            db = self._registry.get('database')
             await self._store_incoming(event, db)
 
         for func in self._endpoints.get(event['type'], list()):
-            f = func(event, slack, facades)
+            f = func(event, slack, self._registry)
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
     def register(self, event, func):
@@ -121,7 +120,7 @@ class EventDispatcher(SlackDispatcher):
         Store incoming event in db
 
         :param msg: message
-        :param db: db facade
+        :param db: db plugin
         :return: None
         """
         ts = event.get('ts') or time.time()

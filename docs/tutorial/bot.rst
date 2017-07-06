@@ -103,15 +103,15 @@ example plugin that respond ``I'm alive!`` when someone send the message
     def __init__(self, loop):
         self._loop = loop
         self._started = True
-        self._facades = None
+        self._registry = None
 
-    async def configure(self, config, router, session, facades):
-        self._facades = facades
+    async def configure(self, config, router, session, registry):
+        self._registry = registry
 
     async def start(self):
 
-        # Get the slack facade to add new message endpoints
-        slack = self._facades.get('slack')
+        # Get the slack plugin api to add new message endpoints
+        slack = self._registry.get('slack')
 
         # Register a new endpoints for message matching the 'hello' regex. We
         # also had the 're.IGNORECASE' flag to also match 'Hello', 'heLLo' etc
@@ -129,7 +129,7 @@ example plugin that respond ``I'm alive!`` when someone send the message
     def started(self):
         return self._started
 
-    async def my_message_response(self, message, slack, facades, match)
+    async def my_message_response(self, message, slack, registry, match)
 
         response = message.response()       # Create a response from the incoming message
         response.text = '''I'm alive!'''    # Set the response text
@@ -147,9 +147,9 @@ it. For that we add the import path of your file to the list of plugins.
             - sirbot.slack
             - my_awesome_plugin
 
-And since we ask for the slack facade in the configuration we need to edit the
-configuration file to make sure ``my_awesome_plugin`` start after slack. For
-this we will add the following snippet at the end:
+And since we ask for the slack plugin api in the configuration we need to edit
+the configuration file to make sure ``my_awesome_plugin`` start after slack.
+For this we will add the following snippet at the end:
 
 .. code-block:: yaml
 

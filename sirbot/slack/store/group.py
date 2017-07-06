@@ -22,15 +22,15 @@ class GroupStore(SlackStore):
     Store for the slack groups (private channels)
     """
 
-    def __init__(self, client, facades, refresh=3600):
-        super().__init__(client, facades, refresh)
+    def __init__(self, client, registry, refresh=3600):
+        super().__init__(client, registry, refresh)
 
     async def all(self):
         pass
 
     async def get(self, id_=None, fetch=False):
 
-        db = self._facades.get('database')
+        db = self._registry.get('database')
         data = await database.__dict__[db.type].group.find(db, id_)
 
         if data and (
@@ -62,7 +62,7 @@ class GroupStore(SlackStore):
     async def _add(self, group, db=None):
 
         if not db:
-            db = self._facades.get('database')
+            db = self._registry.get('database')
 
         await database.__dict__[db.type].group.add(db, group)
         await db.commit()
@@ -70,7 +70,7 @@ class GroupStore(SlackStore):
     async def _delete(self, id_, db=None):
 
         if not db:
-            db = self._facades.get('database')
+            db = self._registry.get('database')
 
         await database.__dict__[db.type].group.delete(db, id_)
         await db.commit()
