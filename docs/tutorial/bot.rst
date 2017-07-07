@@ -97,44 +97,44 @@ example plugin that respond ``I'm alive!`` when someone send the message
 
     class MyAwesomePlugin(Plugin):
 
-    __version__ = '0.0.1'
-    __name__ = 'my_awesome_plugin'
+        __version__ = '0.0.1'
+        __name__ = 'my_awesome_plugin'
 
-    def __init__(self, loop):
-        self._loop = loop
-        self._started = True
-        self._registry = None
+        def __init__(self, loop):
+            self._loop = loop
+            self._started = True
+            self._registry = None
 
-    async def configure(self, config, router, session, registry):
-        self._registry = registry
+        async def configure(self, config, router, session, registry):
+            self._registry = registry
 
-    async def start(self):
+        async def start(self):
 
-        # Get the slack plugin api to add new message endpoints
-        slack = self._registry.get('slack')
+            # Get the slack plugin api to add new message endpoints
+            slack = self._registry.get('slack')
 
-        # Register a new endpoints for message matching the 'hello' regex. We
-        # also had the 're.IGNORECASE' flag to also match 'Hello', 'heLLo' etc
-        # and the we set the mention parameter to True so it will only react
-        # when someone @ him or talk in a direct message.
-        slack.add_message('hello',
-                          self.my_message_response,
-                          flags=re.IGNORECASE,
-                          mention=True)
+            # Register a new endpoints for message matching the 'hello' regex. We
+            # also had the 're.IGNORECASE' flag to also match 'Hello', 'heLLo' etc
+            # and the we set the mention parameter to True so it will only react
+            # when someone @ him or talk in a direct message.
+            slack.add_message('hello',
+                              self.my_message_response,
+                              flags=re.IGNORECASE,
+                              mention=True)
 
-        # Our plugin is successfully started
-        self._started = True
+            # Our plugin is successfully started
+            self._started = True
 
-    @property
-    def started(self):
-        return self._started
+        @property
+        def started(self):
+            return self._started
 
-    async def my_message_response(self, message, slack, registry, match)
+        async def my_message_response(self, message, slack, registry, match)
 
-        response = message.response()       # Create a response from the incoming message
-        response.text = '''I'm alive!'''    # Set the response text
+            response = message.response()       # Create a response from the incoming message
+            response.text = '''I'm alive!'''    # Set the response text
 
-        await slack.send(response)          # Send the response
+            await slack.send(response)          # Send the response
 
 Now that you have created your plugin we need to tell `Sir-bot-a-lot` to load
 it. For that we add the import path of your file to the list of plugins.
