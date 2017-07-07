@@ -6,7 +6,7 @@ from .errors import SlackInactiveDispatcher, SlackNoThread
 logger = logging.getLogger(__name__)
 
 
-class SlackFacade:
+class SlackWrapper:
     """
     A class to compose all available functionality of the slack plugin.
 
@@ -15,9 +15,9 @@ class SlackFacade:
     """
 
     def __init__(self, http_client, users, channels, groups, messages, threads,
-                 bot, facades, dispatcher):
+                 bot, registry, dispatcher):
 
-        self._facades = facades
+        self._registry = registry
         self._http_client = http_client
         self._threads = threads
         self._dispatcher = dispatcher

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class MessageDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, facades,
+    def __init__(self, http_client, users, channels, groups, plugins, registry,
                  threads, save, loop, ping):
 
         super().__init__(
@@ -25,7 +25,7 @@ class MessageDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            facades=facades,
+            registry=registry,
             save=save,
             loop=loop
         )
@@ -50,10 +50,9 @@ class MessageDispatcher(SlackDispatcher):
         """
         logger.debug('Message handler received %s', msg)
 
-        facades = self._facades.new()
-        slack = facades.get('slack')
+        slack = self._registry.get('slack')
         message = await SlackMessage.from_raw(msg, slack)
-        db = facades.get('database')
+        db = self._registry.get('database')
 
         if not message.frm:  # Message without frm (i.e: slackbot)
             logger.debug('Ignoring message without frm')
@@ -72,14 +71,14 @@ class MessageDispatcher(SlackDispatcher):
             logger.debug('Ignoring message from ourselves')
             return
 
-        await self._dispatch(message, slack, facades, db)
+        await self._dispatch(message, slack, self._registry, db)
 
     async def _save_incoming(self, message, db):
         """
         Save incoming message in db
 
         :param message: message
-        :param db: db facade
+        :param db: db plugin
         :return: None
         """
         logger.debug('Saving incoming msg from %s to %s at %s',
@@ -108,13 +107,13 @@ class MessageDispatcher(SlackDispatcher):
 
         self._endpoints[re.compile(match, flags)].append(option)
 
-    async def _dispatch(self, msg, slack_facade, facades, db):
+    async def _dispatch(self, msg, slack, registry, db):
         """
         Dispatch an incoming slack message to the correct functions
 
         :param msg: incoming message
-        :param slack_facade: facade of the slack plugin
-        :param facades: main facade
+        :param slack: slack plugin
+        :param registry: plugin registry
         :return: None
         """
         handlers = list()
@@ -146,7 +145,7 @@ class MessageDispatcher(SlackDispatcher):
                         handlers.append((command['func'], n))
 
         for func in handlers:
-            f = func[0](msg, slack_facade, facades, func[1])
+            f = func[0](msg, slack, registry, func[1])
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
     async def _ping(self, message, slack, *_):
