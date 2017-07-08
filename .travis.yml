@@ -22,9 +22,20 @@ script:
   - python setup.py doc
 
 deploy:
-  provider: script
-  script: curl -X POST http://readthedocs.org/build/sirbot-slack
-  on:
-    repo: pyslackers/sirbot-slack
-    branch: master
-    python: "3.6"
+  - provider: script
+    script: curl -X POST http://readthedocs.org/build/sirbot-slack
+    on:
+      repo: pyslackers/sirbot-slack
+      branch: master
+      python: "3.6"
+  - provider: pypi
+    distributions: sdist bdist_wheel
+    skip_upload_docs: true
+    user: Ovv
+    password:
+      secure: v01FiK0Qy62Bf+6p5vqbW6tbA2o5JCdWaUwZWwicmjsqGvK7xZ6rWMluiFIhNGeQVXFcxzV9zTxjGA3aRG2d64LMxxSQOOQJbQ70NTevxrnJKUluomz8ucUnPWh4I2GQ44QYR/VmxjryRP7RY7dGVusvtYl7Fa3cguHzy95kCrTaKitSajwOdIoVP4AVwlnFcCFjCHTJACLaDkyPMSk5A82MVwvX5eCv8NGxmGJcMXQTo0ZU//FpuEgMidB+RLeD3t5PQ+TJ83Zb1uyQs3HhC5NpOd9BH/jc/mmFWFe2+Q4rY30sMtw13WblKoXYwDafwYmdRJDHJ6M9oVwsYUWLS5Enk3HsfoXOtEYzR96hvBvOWFP6e55YdS5JY9LRolyScLAnF/g2jL4cHDDBdvsXYjBUIRVuahAV9Slo+QstCTDX+pJ+dKpgBCdAaT4dGKcgeIVhHT/QWwlC4nu7pNgr/p8Fn/jQQJV16QONOuNYXTCmuPOauRcAXQS/Ub/nCmiYW8alO4LrXgakpFPzUeeuV7b2kQPEwbvTDrrK/Rbiv7j99PR5+kWF1Y5FHeZT6mrYVuTuUF0cluL+4RopTmHlciTmji5ciPy0pDyXTWZpWtbNjtVRBBpthFiaZORwXvexfvSmF0VA9Xgxxx1gaJ6kzIR7epXZOqyxbrjoBGgIVT0=
+    on:
+      repo: pyslackers/sirbot-slack
+      branch: master
+      python: '3.6'
+      tags: true
