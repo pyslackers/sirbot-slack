@@ -7,14 +7,13 @@ logger = logging.getLogger(__name__)
 
 class SlackDispatcher:
 
-    def __init__(self, http_client, users, channels, groups, plugins, registry,
+    def __init__(self, http_client, users, channels, groups, plugins,
                  loop, save=None):
 
         if not save:
             save = list()
 
         self._loop = loop
-        self._registry = registry
         self._save = save
         self._plugins = plugins
         self._users = users

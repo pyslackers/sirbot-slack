@@ -4,6 +4,7 @@ import json
 import logging
 
 from aiohttp.web import Response
+from sirbot.core import registry
 from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ActionDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, registry,
+    def __init__(self, http_client, users, channels, groups, plugins,
                  save, loop, token):
 
         super().__init__(
@@ -24,7 +25,6 @@ class ActionDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            registry=registry,
             save=save,
             loop=loop
         )
@@ -44,7 +44,7 @@ class ActionDispatcher(SlackDispatcher):
 
         logger.debug('Action handler received: %s', payload)
 
-        slack = self._registry.get('slack')
+        slack = registry.get('slack')
         settings = self._endpoints.get(payload['callback_id'])
 
         if not settings:
@@ -57,12 +57,12 @@ class ActionDispatcher(SlackDispatcher):
             logger.debug('Saving incoming action %s from %s',
                          action.callback_id,
                          action.frm.id)
-            db = self._registry.get('database')
+            db = registry.get('database')
             await database.__dict__[db.type].dispatcher.save_incoming_action(
                 db, action)
             await db.commit()
 
-        coroutine = settings['func'](action, slack, self._registry)
+        coroutine = settings['func'](action, slack)
         ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
         if settings.get('public'):

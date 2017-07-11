@@ -5,7 +5,7 @@ import yaml
 from collections import defaultdict
 
 from sirbot.utils import merge_dict
-from sirbot.core import Plugin
+from sirbot.core import Plugin, registry
 
 from . import database, sync
 from .dispatcher import (EventDispatcher,
@@ -38,7 +38,6 @@ class SirBotSlack(Plugin):
         self._loop = loop
         self._router = None
         self._config = None
-        self._registry = None
         self._session = None
         self._bot_token = None
         self._app_token = None
@@ -61,7 +60,7 @@ class SirBotSlack(Plugin):
     def started(self):
         return self._started
 
-    async def configure(self, config, router, session, registry):
+    async def configure(self, config, router, session):
         logger.debug('Configuring slack plugin')
         path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), 'config.yml'
@@ -74,7 +73,6 @@ class SirBotSlack(Plugin):
 
         self._router = router
         self._session = session
-        self._registry = registry
 
         self._bot_token = os.environ.get('SIRBOT_SLACK_BOT_TOKEN', '')
         self._app_token = os.environ.get('SIRBOT_SLACK_TOKEN', '')
@@ -82,7 +80,7 @@ class SirBotSlack(Plugin):
             'SIRBOT_SLACK_VERIFICATION_TOKEN'
         )
 
-        if 'database' not in self._registry:
+        if 'database' not in registry:
             raise SlackSetupError('A database is required')
 
         if not self._bot_token and not self._app_token:
@@ -109,25 +107,21 @@ class SirBotSlack(Plugin):
 
         self._users = UserStore(
             client=self._http_client,
-            registry=self._registry,
             refresh=self._config['refresh']['user']
         )
 
         self._channels = ChannelStore(
             client=self._http_client,
-            registry=self._registry,
             refresh=self._config['refresh']['channel']
         )
 
         self._groups = GroupStore(
             client=self._http_client,
-            registry=self._registry,
             refresh=self._config['refresh']['group']
         )
 
         self._messages = MessageStore(
             client=self._http_client,
-            registry=self._registry
         )
 
         if self._config['rtm'] or self._config['endpoints']['events']:
@@ -140,7 +134,6 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                registry=self._registry,
                 save=self._config['save']['messages'],
                 ping=self._config['ping'],
                 loop=self._loop,
@@ -153,7 +146,6 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                registry=self._registry,
                 loop=self._loop,
                 message_dispatcher=self._dispatcher['message'],
                 event_save=self._config['save']['events'],
@@ -184,7 +176,6 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                registry=self._registry,
                 loop=self._loop,
                 save=self._config['save']['actions'],
                 token=self._verification_token
@@ -205,7 +196,6 @@ class SirBotSlack(Plugin):
                 channels=self._channels,
                 groups=self._groups,
                 plugins=self._pm,
-                registry=self._registry,
                 loop=self._loop,
                 save=self._config['save']['commands'],
                 token=self._verification_token
@@ -230,7 +220,6 @@ class SirBotSlack(Plugin):
             groups=self._groups,
             messages=self._messages,
             bot=self.bot,
-            registry=self._registry,
             threads=self._threads,
             dispatcher=self._dispatcher
         )
@@ -238,7 +227,7 @@ class SirBotSlack(Plugin):
     async def start(self):
         logger.debug('Starting slack plugin')
 
-        db = self._registry.get('database')
+        db = registry.get('database')
         if db.type not in SUPPORTED_DATABASE:
             raise SlackSetupError('Database must be one of %s',
                                   ', '.join(SUPPORTED_DATABASE))
@@ -296,7 +285,7 @@ class SirBotSlack(Plugin):
         return self.__version__
 
     async def _create_db_table(self):
-        db = self._registry.get('database')
+        db = registry.get('database')
         await database.__dict__[db.type].create_table(db)
         await db.set_plugin_metadata(self)
         await db.commit()

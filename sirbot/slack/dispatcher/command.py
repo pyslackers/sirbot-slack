@@ -3,6 +3,7 @@ import inspect
 import logging
 
 from aiohttp.web import Response
+from sirbot.core import registry
 from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, registry,
+    def __init__(self, http_client, users, channels, groups, plugins,
                  save, loop, token):
 
         super().__init__(
@@ -23,7 +24,6 @@ class CommandDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            registry=registry,
             save=save,
             loop=loop
         )
@@ -39,7 +39,7 @@ class CommandDispatcher(SlackDispatcher):
 
         logger.debug('Command handler received: %s', data['command'])
 
-        slack = self._registry.get('slack')
+        slack = registry.get('slack')
         settings = self._endpoints.get(data['command'])
 
         if not settings:
@@ -51,12 +51,12 @@ class CommandDispatcher(SlackDispatcher):
                 or self._save is True:
             logger.debug('Saving incoming command %s from %s',
                          command.command, command.frm.id)
-            db = self._registry.get('database')
+            db = registry.get('database')
             await database.__dict__[db.type].dispatcher.save_incoming_command(
                 db, command)
             await db.commit()
 
-        coroutine = settings['func'](command, slack, self._registry)
+        coroutine = settings['func'](command, slack)
         ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
 
         # if settings.get('public'):
