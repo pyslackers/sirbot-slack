@@ -13,6 +13,7 @@ from .dispatcher import SlackDispatcher
 from .. import database
 from ..store.message import SlackMessage
 from ..store.channel import Channel
+from ..store.group import Group
 
 logger = logging.getLogger(__name__)
 
@@ -150,5 +151,5 @@ class MessageDispatcher(SlackDispatcher):
 
     async def _ping(self, message, slack, *_):
 
-        if isinstance(message.to, Channel):
+        if isinstance(message.to, Channel) or isinstance(message.to, Group):
             await slack.add_reaction(message, self._ping_emoji)

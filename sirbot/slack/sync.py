@@ -18,7 +18,7 @@ def add_to_slack(slack):
     slack.add_event('team_join', team_join)
 
 
-async def channel_archive(event, slack, _):
+async def channel_archive(event, slack):
     """
     Use the channel archive event to delete the channel
     from the ChannelManager
@@ -26,7 +26,7 @@ async def channel_archive(event, slack, _):
     await slack.channels.get(event['channel'], fetch=True)
 
 
-async def channel_created(event, slack, _):
+async def channel_created(event, slack):
     """
     Use the channel created event to add the channel
     to the ChannelManager
@@ -34,7 +34,7 @@ async def channel_created(event, slack, _):
     await slack.channels.get(event['channel']['id'], fetch=True)
 
 
-async def channel_deleted(event, slack, _):
+async def channel_deleted(event, slack):
     """
     Use the channel delete event to delete the channel
     from the ChannelManager
@@ -42,21 +42,21 @@ async def channel_deleted(event, slack, _):
     await slack.channels.get(event['channel'], fetch=True)
 
 
-async def channel_joined(event, slack, _):
+async def channel_joined(event, slack):
     """
     Use the channel joined event to update the channel status
     """
     await slack.channels.get(event['channel']['id'], fetch=True)
 
 
-async def channel_left(event, slack, _):
+async def channel_left(event, slack):
     """
     Use the channel left event to update the channel status
     """
     await slack.channels.get(event['channel'], fetch=True)
 
 
-async def channel_rename(event, slack, _):
+async def channel_rename(event, slack):
     """
     User the channel rename event to update the name
     of the channel
@@ -72,7 +72,7 @@ async def channel_unarchive(event, slack, _):
     await slack.channels.get(event['channel'], fetch=True)
 
 
-async def group_archive(event, slack, _):
+async def group_archive(event, slack):
     """
     Use the channel archive event to delete the channel
     from the ChannelManager
@@ -80,21 +80,21 @@ async def group_archive(event, slack, _):
     await slack.groups.get(event['channel'], fetch=True)
 
 
-async def group_joined(event, slack, _):
+async def group_joined(event, slack):
     """
     Use the channel joined event to update the channel status
     """
     await slack.groups.get(event['channel']['id'], fetch=True)
 
 
-async def group_left(event, slack, _):
+async def group_left(event, slack):
     """
     Use the channel left event to update the channel status
     """
     await slack.groups.get(event['channel'], fetch=True)
 
 
-async def group_rename(event, slack, _):
+async def group_rename(event, slack,):
     """
     User the channel rename event to update the name
     of the channel
@@ -102,7 +102,7 @@ async def group_rename(event, slack, _):
     await slack.groups.get(event['channel']['id'], fetch=True)
 
 
-async def group_unarchive(event, slack, _):
+async def group_unarchive(event, slack):
     """
     Use the channel unarchive event to delete the channel
     from the ChannelManager
@@ -110,14 +110,14 @@ async def group_unarchive(event, slack, _):
     await slack.groups.get(event['channel'], fetch=True)
 
 
-async def user_typing(event, slack, _):
+async def user_typing(event, slack):
     """
     Use the user typing event to make sure the user is in cache
     """
     await slack.users.get(event['user'])
 
 
-async def team_join(event, slack, _):
+async def team_join(event, slack):
     """
     Use the team join event to add an user to the user store
     """
