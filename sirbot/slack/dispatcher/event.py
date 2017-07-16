@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 
 from aiohttp.web import Response
+from sirbot.core import registry
 from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
@@ -19,7 +20,7 @@ SUBTYPE_TO_EVENT = ['message_changed', 'message_deleted']
 
 
 class EventDispatcher(SlackDispatcher):
-    def __init__(self, http_client, users, channels, groups, plugins, registry,
+    def __init__(self, http_client, users, channels, groups, plugins,
                  event_save, message_dispatcher, loop, token):
 
         super().__init__(
@@ -28,7 +29,6 @@ class EventDispatcher(SlackDispatcher):
             channels=channels,
             groups=groups,
             plugins=plugins,
-            registry=registry,
             save=event_save,
             loop=loop
         )
@@ -93,15 +93,15 @@ class EventDispatcher(SlackDispatcher):
     async def _incoming(self, event):
         logger.debug('Event handler received: %s', event)
 
-        slack = self._registry.get('slack')
+        slack = registry.get('slack')
 
         if isinstance(self._save, list) and event['type'] in self._save \
                 or self._save is True:
-            db = self._registry.get('database')
+            db = registry.get('database')
             await self._store_incoming(event, db)
 
         for func in self._endpoints.get(event['type'], list()):
-            f = func(event, slack, self._registry)
+            f = func(event, slack)
             ensure_future(coroutine=f, loop=self._loop, logger=logger)
 
     def register(self, event, func):

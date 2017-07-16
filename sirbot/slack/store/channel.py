@@ -2,6 +2,8 @@ import json
 import logging
 import time
 
+from sirbot.core import registry
+
 from .store import SlackStore, SlackChannelItem
 from .. import database
 
@@ -33,8 +35,8 @@ class ChannelStore(SlackStore):
     Store for the slack channels
     """
 
-    def __init__(self, client, registry, refresh=3600):
-        super().__init__(client, registry, refresh)
+    def __init__(self, client, refresh=3600):
+        super().__init__(client, refresh)
 
     async def all(self):
 
@@ -58,7 +60,7 @@ class ChannelStore(SlackStore):
         if not id_ and not name:
             raise SyntaxError('id_ or name must be supplied')
 
-        db = self._registry.get('database')
+        db = registry.get('database')
         if name:
             data = await database.__dict__[db.type].channel.find_by_name(db,
                                                                          name)
@@ -99,7 +101,7 @@ class ChannelStore(SlackStore):
         """
 
         if not db:
-            db = self._registry.get('database')
+            db = registry.get('database')
 
         await database.__dict__[db.type].channel.add(db, channel)
         await db.commit()
@@ -113,7 +115,7 @@ class ChannelStore(SlackStore):
         """
 
         if not db:
-            db = self._registry.get('database')
+            db = registry.get('database')
 
         await database.__dict__[db.type].channel.delete(db, id_)
         await db.commit()

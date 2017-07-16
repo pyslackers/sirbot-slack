@@ -2,6 +2,8 @@ import json
 import logging
 import time
 
+from sirbot.core import registry
+
 from .. import database
 from .store import SlackStore, SlackItem
 
@@ -56,8 +58,8 @@ class UserStore(SlackStore):
     Manager for the user object
     """
 
-    def __init__(self, client, registry, refresh=3600):
-        super().__init__(client, registry, refresh)
+    def __init__(self, client, refresh=3600):
+        super().__init__(client, refresh)
 
     async def all(self, fetch=False, deleted=False):
         """
@@ -69,7 +71,7 @@ class UserStore(SlackStore):
         :param deleted:
         :return:
         """
-        db = self._registry.get('database')
+        db = registry.get('database')
 
         if fetch:
             users = list()
@@ -113,7 +115,7 @@ class UserStore(SlackStore):
         :param update: query the slack api for updated user info
         :return: User
         """
-        db = self._registry.get('database')
+        db = registry.get('database')
         data = await database.__dict__[db.type].user.find(db, id_)
 
         if data and (
@@ -150,7 +152,7 @@ class UserStore(SlackStore):
         """
 
         if not db:
-            db = self._registry.get('database')
+            db = registry.get('database')
 
         await database.__dict__[db.type].user.add(db, user)
         await db.commit()
@@ -164,7 +166,7 @@ class UserStore(SlackStore):
         """
 
         if not db:
-            db = self._registry.get('database')
+            db = registry.get('database')
 
         await database.__dict__[db.type].user.delete(db, id_)
         await db.commit()
@@ -189,7 +191,7 @@ class UserStore(SlackStore):
 
         if not user.send_id:
             if not db:
-                db = self._registry.get('database')
+                db = registry.get('database')
 
             user.dm_id = await self._client.open_dm(user.id)
             await database.__dict__[db.type].user.update_dm_id(

@@ -5,9 +5,8 @@ logger = logging.getLogger(__name__)
 
 class SlackStore:
 
-    def __init__(self, client, registry, refresh=3600):
+    def __init__(self, client, refresh=3600):
         self._client = client
-        self._registry = registry
         self._refresh = refresh
 
     async def all(self):

@@ -15,9 +15,8 @@ class SlackWrapper:
     """
 
     def __init__(self, http_client, users, channels, groups, messages, threads,
-                 bot, registry, dispatcher):
+                 bot, dispatcher):
 
-        self._registry = registry
         self._http_client = http_client
         self._threads = threads
         self._dispatcher = dispatcher
