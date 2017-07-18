@@ -8,13 +8,10 @@ logger = logging.getLogger('sirbot.slack')
 
 class SlackCommand:
     def __init__(self, command, frm, to, response_url, timestamp,
-                 text='', raw=None, settings=None):
+                 text='', raw=None):
 
         if not raw:
             raw = dict()
-
-        if not settings:
-            settings = dict()
 
         self.command = command
         self.frm = frm
@@ -23,10 +20,9 @@ class SlackCommand:
         self.timestamp = timestamp
         self.text = text
         self.raw = raw
-        self.settings = settings
 
     @classmethod
-    async def from_raw(cls, data, slack, timestamp=None, settings=None):
+    async def from_raw(cls, data, slack, timestamp=None):
 
         frm = await slack.users.get(data['user_id'])
         if data['channel_id'].startswith('C'):
@@ -47,18 +43,16 @@ class SlackCommand:
             text=data['text'],
             timestamp=timestamp,
             raw=data,
-            settings=settings,
         )
 
-    def response(self):
+    def response(self, type_='in_channel'):
 
-        if self.settings.get('public'):
-            response_type = 'in_channel'
-        else:
-            response_type = 'ephemeral'
+        if type_ not in ('in_channel', 'ephemeral'):
+            raise ValueError('''response type must be one of 'in_channel',
+             'ephemeral' ''')
 
         return SlackMessage(
             to=self.to,
             response_url=self.response_url,
-            response_type=response_type
+            response_type=type_
         )

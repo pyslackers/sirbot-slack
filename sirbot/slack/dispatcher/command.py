@@ -40,12 +40,12 @@ class CommandDispatcher(SlackDispatcher):
         logger.debug('Command handler received: %s', data['command'])
 
         slack = registry.get('slack')
-        settings = self._endpoints.get(data['command'])
+        func = self._endpoints.get(data['command'])
 
-        if not settings:
+        if not func:
             raise SlackUnknownCommand(data['command'])
 
-        command = await SlackCommand.from_raw(data, slack, settings=settings)
+        command = await SlackCommand.from_raw(data, slack)
 
         if isinstance(self._save, list) and data['command'] in self._save \
                 or self._save is True:
@@ -56,19 +56,11 @@ class CommandDispatcher(SlackDispatcher):
                 db, command)
             await db.commit()
 
-        coroutine = settings['func'](command, slack)
+        coroutine = func(command, slack)
         ensure_future(coroutine=coroutine, loop=self._loop, logger=logger)
-
-        # if settings.get('public'):
-        #     return Response(
-        #         status=200,
-        #         body=json.dumps({"response_type": "in_channel"}),
-        #         content_type='application/json'
-        #     )
-        # else:
         return Response(status=200)
 
-    def register(self, command, func, public=False):
+    def register(self, command, func):
         logger.debug('Registering slash command: %s, %s from %s',
                      command,
                      func.__name__,
@@ -77,5 +69,4 @@ class CommandDispatcher(SlackDispatcher):
         if not asyncio.iscoroutinefunction(func):
             func = asyncio.coroutine(func)
 
-        settings = {'func': func, 'public': public}
-        self._endpoints[command] = settings
+        self._endpoints[command] = func
