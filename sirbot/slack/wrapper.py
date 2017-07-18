@@ -145,9 +145,9 @@ class SlackWrapper:
         else:
             raise SlackInactiveDispatcher
 
-    def add_command(self, command, func, public=False):
+    def add_command(self, command, func):
         if 'command' in self._dispatcher:
-            self._dispatcher['command'].register(command, func, public=public)
+            self._dispatcher['command'].register(command, func)
         else:
             raise SlackInactiveDispatcher
 
