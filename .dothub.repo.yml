@@ -1,0 +1,66 @@
+collaborators:
+  mikefromit:
+    permission: admin
+  mrasband:
+    permission: admin
+  ovv:
+    permission: admin
+  seanson:
+    permission: admin
+hooks:
+  travis:
+    active: true
+    config:
+      domain: notify.travis-ci.org
+      token: '********'
+      user: Ovvovy
+    events:
+    - create
+    - delete
+    - issue_comment
+    - member
+    - membership
+    - public
+    - pull_request
+    - push
+    - repository
+labels:
+  bug:
+    color: ee0701
+  difficulty/easy:
+    color: c2e0c6
+  difficulty/hard:
+    color: e99695
+  difficulty/medium:
+    color: fef2c0
+  difficulty/newcomers:
+    color: c5def5
+  documentation:
+    color: 1d76db
+  etc/blocked:
+    color: b60205
+  etc/duplicate:
+    color: cccccc
+  etc/invalid:
+    color: cccccc
+  etc/question:
+    color: cccccc
+  etc/wontfix:
+    color: cccccc
+  feature:
+    color: d93f0b
+  help wanted:
+    color: 128A0C
+  proposal:
+    color: 5319e7
+options:
+  allow_merge_commit: false
+  allow_rebase_merge: true
+  allow_squash_merge: true
+  description: Slack plugin for Sir-bot-a-lot
+  has_downloads: true
+  has_issues: true
+  has_wiki: false
+  homepage: https://sirbot-slack.rtfd.io
+  name: sirbot-slack
+  private: false

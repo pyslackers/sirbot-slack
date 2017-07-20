@@ -21,9 +21,18 @@ script:
   - python setup.py test
   - python setup.py doc
 
+before_deploy:
+  - pip install dothub
+
 deploy:
   - provider: script
     script: curl -X POST http://readthedocs.org/build/sirbot-slack
+    on:
+      repo: pyslackers/sirbot-slack
+      branch: master
+      python: "3.6"
+  - provider: script
+    script: "yes | dothub repo --owner pyslackers --repository sirbot-slack push"
     on:
       repo: pyslackers/sirbot-slack
       branch: master
