@@ -1,7 +1,6 @@
 language: python
 
 python:
-  - "3.5"
   - "3.6"
   - "3.7-dev"
   - "nightly"
@@ -12,7 +11,6 @@ matrix:
     - python: "nightly"
 
 install:
-  - pip install git+https://github.com/pyslackers/sir-bot-a-lot.git
   - pip install -r requirements/requirements.txt
   - pip install -r requirements/requirements_dev.txt
 

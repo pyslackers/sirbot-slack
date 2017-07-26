@@ -1,8 +1,0 @@
-recommonmark
-Sphinx
-pytest
-pytest-aiohttp
-pytest-asyncio
-pytest-cov
-pytest-runner
-flake8
