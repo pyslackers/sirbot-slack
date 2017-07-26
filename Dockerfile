@@ -5,6 +5,9 @@ RUN apk add --update --no-cache libxml2-dev libxslt-dev
 
 WORKDIR /app
 
+COPY requirements requirements
+RUN pip install -r requirements/requirements.txt
+
 COPY . .
 RUN python3 -m pip install .
 
