@@ -10,6 +10,7 @@ apscheduler==3.3.1        # via sirbot.plugins
 async-timeout==1.2.1      # via aiohttp, sir-bot-a-lot, sirbot.plugins
 chardet==3.0.4            # via aiohttp, sir-bot-a-lot, sirbot.plugins
 distance==0.1.3           # via sirbot.plugins
+gidgethub==2.4.1          # via sirbot.plugins
 lxml==3.8.0               # via aiohttp-xmlrpc, sirbot.plugins
 mako==1.0.6               # via sir-bot-a-lot, sirbot.plugins
 markupsafe==1.0           # via mako, sir-bot-a-lot, sirbot.plugins
@@ -17,9 +18,10 @@ multidict==3.1.0          # via aiohttp, sir-bot-a-lot, sirbot.plugins, yarl
 pluggy==0.4.0             # via sir-bot-a-lot, sirbot.plugins
 pytz==2017.2              # via apscheduler, sirbot.plugins, tzlocal
 pyyaml==3.12              # via sir-bot-a-lot, sirbot.plugins
-sir-bot-a-lot==0.1.1
-sirbot.plugins==0.1.4
+sir-bot-a-lot==0.2.0
+sirbot.plugins==0.2.0
 six==1.10.0               # via apscheduler, sirbot.plugins
 slimurl==0.7.8            # via aiohttp-xmlrpc, sirbot.plugins
 tzlocal==1.4              # via apscheduler, sirbot.plugins
+uritemplate==3.0.0        # via gidgethub, sirbot.plugins
 yarl==0.11.0              # via aiohttp, sir-bot-a-lot, sirbot.plugins
