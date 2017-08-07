@@ -1,7 +1,7 @@
-import re
 import asyncio
 import inspect
 import logging
+import re
 
 from collections import defaultdict
 from sqlite3 import IntegrityError
@@ -11,9 +11,9 @@ from sirbot.utils import ensure_future
 
 from .dispatcher import SlackDispatcher
 from .. import database
-from ..store.message import SlackMessage
 from ..store.channel import Channel
 from ..store.group import Group
+from ..store.message import SlackMessage
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,8 @@ class MessageDispatcher(SlackDispatcher):
         )
         await db.commit()
 
-    def register(self, match, func, flags=0, mention=False, admin=False):
+    def register(self, match, func, flags=0, mention=False, admin=False,
+                 channel_id='*'):
 
         logger.debug('Registering message: %s, %s from %s',
                      match,
@@ -104,7 +105,8 @@ class MessageDispatcher(SlackDispatcher):
         option = {
             'func': func,
             'mention': mention,
-            'admin': admin
+            'admin': admin,
+            'channel_id': channel_id
         }
 
         self._endpoints[re.compile(match, flags)].append(option)
@@ -120,18 +122,42 @@ class MessageDispatcher(SlackDispatcher):
         handlers = list()
 
         if msg.thread in self._threads:
-            if msg.frm.id in self._threads[msg.thread]:
-                logger.debug('Located thread handler for "%s" and "%s"',
-                             msg.thread, msg.frm.id)
-                handlers.append((self._threads[msg.thread][msg.frm.id], None))
-                del self._threads[msg.thread][msg.frm.id]
-            elif 'all' in self._threads[msg.thread]:
-                logger.debug('Located thread handler for "%s"', msg.thread)
-                handlers.append((self._threads[msg.thread]['all'], None))
-                del self._threads[msg.thread]['all']
+            handlers.extend(self._find_thread_handlers(msg))
 
-        if not handlers:
-            for match, commands in self._endpoints.items():
+        handlers.extend(self._find_handlers(msg))
+
+        for func in handlers:
+            f = func[0](msg, slack, func[1])
+            ensure_future(coroutine=f, loop=self._loop, logger=logger)
+
+    def _find_thread_handlers(self, msg):
+        handlers = list()
+
+        if msg.frm.id in self._threads[msg.thread]:
+            logger.debug('Located thread handler for "%s" and "%s"',
+                         msg.thread, msg.frm.id)
+            handlers.append((self._threads[msg.thread][msg.frm.id], None))
+            del self._threads[msg.thread][msg.frm.id]
+        elif 'all' in self._threads[msg.thread]:
+            logger.debug('Located thread handler for "%s"', msg.thread)
+            handlers.append((self._threads[msg.thread]['all'], None))
+            del self._threads[msg.thread]['all']
+
+        return handlers
+
+    def _find_handlers(self, msg):
+        handlers = list()
+
+        for match, commands in self._endpoints.items():
+            commands = [
+                command for command in commands
+                if (
+                    command['channel_id'] == '*'
+                    or msg.to.id in command['channel_id']
+                )
+            ]
+
+            if commands:
                 n = match.search(msg.text)
                 if n:
                     for command in commands:
@@ -145,9 +171,7 @@ class MessageDispatcher(SlackDispatcher):
                                 msg.text))
                         handlers.append((command['func'], n))
 
-        for func in handlers:
-            f = func[0](msg, slack, func[1])
-            ensure_future(coroutine=f, loop=self._loop, logger=logger)
+        return handlers
 
     async def _ping(self, message, slack, *_):
 

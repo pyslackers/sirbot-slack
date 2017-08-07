@@ -151,10 +151,11 @@ class SlackWrapper:
         else:
             raise SlackInactiveDispatcher
 
-    def add_message(self, match, func, flags=0, mention=False, admin=False):
+    def add_message(self, match, func, flags=0, mention=False, admin=False,
+                    channel_id='*'):
         if 'action' in self._dispatcher:
             self._dispatcher['message'].register(match, func, flags, mention,
-                                                 admin)
+                                                 admin, channel_id)
         else:
             raise SlackInactiveDispatcher
 
