@@ -2,7 +2,6 @@ import asyncio
 import inspect
 import logging
 import re
-
 from collections import defaultdict
 from sqlite3 import IntegrityError
 
@@ -152,8 +151,8 @@ class MessageDispatcher(SlackDispatcher):
             commands = [
                 command for command in commands
                 if (
-                    command['channel_id'] == '*'
-                    or msg.to.id in command['channel_id']
+                    command['channel_id'] == '*' or msg.to.id in
+                    command['channel_id']
                 )
             ]
 
