@@ -1,29 +1,3 @@
-collaborators:
-  mikefromit:
-    permission: admin
-  mrasband:
-    permission: admin
-  ovv:
-    permission: admin
-  seanson:
-    permission: admin
-hooks:
-  travis:
-    active: true
-    config:
-      domain: notify.travis-ci.org
-      token: '********'
-      user: Ovvovy
-    events:
-    - create
-    - delete
-    - issue_comment
-    - member
-    - membership
-    - public
-    - pull_request
-    - push
-    - repository
 labels:
   bug:
     color: ee0701
