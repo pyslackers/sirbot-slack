@@ -152,18 +152,17 @@ class SlackMessage:
     async def from_raw(cls, data, slack):
 
         text = data.get('text') or data.get('message', {}).get('text', '')
-        user_id = data.get('user') or data.get('message', {}).get('user')
         channel_id = data.get('channel') or data.get('message', {}).get(
             'channel')
         subtype = data.get('subtype') or data.get('message', {}).get('subtype',
                                                                      'message')
 
+        user_id = cls._find_user(data)
+
         if user_id:
             frm = await slack.users.get(user_id)
         else:
-            bot_id = data.get('bot_id')\
-                or data.get('message', {}).get('bot_id')
-            frm = await slack.users.get(bot_id)
+            frm = None
 
         if channel_id.startswith('D'):
             mention = True
@@ -196,6 +195,21 @@ class SlackMessage:
         )
 
         return message
+
+    @staticmethod
+    def _find_user(data):
+        if 'user' in data:
+            return data['user']
+        elif 'bot_id' in data:
+            return data['bot_id']
+        elif 'message' in data and 'user' in data['message']:
+            return data['message']['user_id']
+        elif 'message' in data and 'bot_id' in data['message']:
+            return data['message']['bot_id']
+        elif 'comment' in data:
+            return data['comment']['user']
+        else:
+            return
 
 
 class SlackContent:
